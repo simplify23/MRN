@@ -18,7 +18,7 @@ As a result, **we obtain a competitive model with only real data, which has bett
 
 This work is a stepping stone toward STR with fewer labels, and we hope this work will facilitate future work on this topic.
 
-<img src="teaser.png" width="50%" title="teaser">
+<img src="demo_image/teaser.png" width="50%" title="teaser">
 
 
 

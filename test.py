@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import string
 import argparse
 import re
 from datetime import date
@@ -14,8 +15,8 @@ from nltk.metrics.distance import edit_distance
 from tqdm import tqdm
 
 from utils import CTCLabelConverter, AttnLabelConverter, Averager
-from data.dataset import hierarchical_dataset, AlignCollate
-from modules.model import Model
+from dataset import hierarchical_dataset, AlignCollate
+from model import Model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

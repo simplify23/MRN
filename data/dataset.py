@@ -12,7 +12,7 @@ import lmdb
 import numpy as np
 import torch
 from torch.utils.data import Dataset, ConcatDataset, Subset
-from torch._utils import _accumulatesensitiv
+from torch._utils import _accumulate
 import torchvision.transforms as transforms
 
 
@@ -275,12 +275,12 @@ class LmdbDataset(Dataset):
             buf.seek(0)
 
             try:
-                img = PIL.Image.open(buf).convert("RGB")
+                img = PIL.Image.open(buf).convert("RGBA")
 
             except IOError:
                 print(f"Corrupted image for {index}")
                 # make dummy image and dummy label for corrupted image.
-                img = PIL.Image.new("RGB", (self.opt.imgW, self.opt.imgH))
+                img = PIL.Image.new("RGBA", (self.opt.imgW, self.opt.imgH))
                 label = "[dummy_label]"
 
         return (img, label)
@@ -322,12 +322,12 @@ class LmdbDataset_unlabel(Dataset):
             buf.seek(0)
 
             try:
-                img = PIL.Image.open(buf).convert("RGB")
+                img = PIL.Image.open(buf).convert("RGBA")
 
             except IOError:
                 print(f"Corrupted image for {img_key}")
                 # make dummy image for corrupted image.
-                img = PIL.Image.new("RGB", (opt.imgW, opt.imgH))
+                img = PIL.Image.new("RGBA", (opt.imgW, opt.imgH))
 
         return img
 
@@ -352,12 +352,12 @@ class RawDataset(Dataset):
     def __getitem__(self, index):
 
         try:
-            img = PIL.Image.open(self.image_path_list[index]).convert("RGB")
+            img = PIL.Image.open(self.image_path_list[index]).convert("RGBA")
 
         except IOError:
             print(f"Corrupted image for {index}")
             # make dummy image and dummy label for corrupted image.
-            img = PIL.Image.new("RGB", (self.opt.imgW, self.opt.imgH))
+            img = PIL.Image.new("RGBA", (self.opt.imgW, self.opt.imgH))
 
         return (img, self.image_path_list[index])
 

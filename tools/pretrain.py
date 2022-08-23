@@ -2,19 +2,22 @@ import os
 import sys
 import time
 import random
+import string
 import argparse
 
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn.init as init
+import torch.optim as optim
 import torch.utils.data
 import numpy as np
 from tqdm import tqdm
 
-from utils import Averager, adjust_learning_rate
-from data.dataset import hierarchical_dataset, AlignCollate_SelfSL, Batch_Balanced_Dataset
-from modules.model import Model
+from utils import Averager, adjust_learning_rate, AttnLabelConverter
+from dataset import hierarchical_dataset, AlignCollate_SelfSL, Batch_Balanced_Dataset
+from model import Model
 from modules.self_supervised import MoCoLoss
+from test import validation
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

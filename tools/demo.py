@@ -1,4 +1,5 @@
 import sys
+import string
 import argparse
 
 import torch
@@ -7,8 +8,8 @@ import torch.utils.data
 import torch.nn.functional as F
 
 from utils import CTCLabelConverter, AttnLabelConverter
-from data.dataset import RawDataset, AlignCollate
-from modules.model import Model
+from dataset import RawDataset, AlignCollate
+from model import Model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

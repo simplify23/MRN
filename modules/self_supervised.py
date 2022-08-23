@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 
-from modules.model import Model
+from model import Model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
