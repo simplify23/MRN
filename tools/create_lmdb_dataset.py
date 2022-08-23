@@ -6,6 +6,7 @@ import lmdb
 import cv2
 import numpy as np
 from tqdm import tqdm
+lan_list = ["Arabic", "Latin", "Chinese", "Japanese", "Korean", "Bangla", "Symbols","Hindi"]
 
 
 def checkImageIsValid(imageBin):
@@ -24,8 +25,22 @@ def writeCache(env, cache):
         for k, v in cache.items():
             txn.put(k, v)
 
+def write_txt(lexicon, name):
+    # -*-coding:utf-8-*-
+    file = name+".txt"
+    # 写之前，先检验文件是否存在，存在就删掉
+    if os.path.exists(file):
+        os.remove(file)
 
-def createDataset(inputPath, gtFile, outputPath, checkValid=True):
+    # 以写的方式打开文件，如果文件不存在，就会自动创建
+    file_write_obj = open(file, 'w')
+    for key in lexicon:
+#         print(key)
+        file_write_obj.writelines(key)
+        file_write_obj.write('\n')
+    file_write_obj.close()
+
+def createDataset(inputPath, gtFile, outputPath, checkValid=True,lan_lmdb=None):
     """a modified version of CRNN torch repository https://github.com/bgshih/crnn/blob/master/tool/create_dataset.py
     Create LMDB dataset for training and evaluation.
     ARGS:
@@ -40,16 +55,21 @@ def createDataset(inputPath, gtFile, outputPath, checkValid=True):
         os.system(f"rm -r {outputPath}")
 
     os.makedirs(outputPath, exist_ok=True)
-    env = lmdb.open(outputPath, map_size=30 * 2 ** 30)
+    env = lmdb.open(outputPath, map_size=80 * 2 ** 30)
     cache = {}
     cnt = 1
+    lexicon=set()
 
     with open(gtFile, "r", encoding="utf-8-sig") as data:
         datalist = data.readlines()
 
     nSamples = len(datalist)
     for i in tqdm(range(nSamples), total=nSamples, position=0, leave=True):
-        imagePath, label = datalist[i].strip("\n").split("\t")
+        # imagePath, label = datalist[i].strip("\n").split("\t")
+        imagePath, lan, label = datalist[i].strip("\n").split(",", 2)
+        if lan_lmdb != None:
+            if lan !=lan_lmdb:
+                continue
         imagePath = os.path.join(inputPath, imagePath)
 
         # # only use alphanumeric data
@@ -79,6 +99,11 @@ def createDataset(inputPath, gtFile, outputPath, checkValid=True):
         cache[labelKey] = label.encode()
         cache[imagepathKey] = imagePath.encode()
 
+        # print(label)
+        # label = label.decode('utf-8')
+        for char in label:
+            lexicon.add(char)
+
         if cnt % 1000 == 0:
             writeCache(env, cache)
             cache = {}
@@ -87,6 +112,8 @@ def createDataset(inputPath, gtFile, outputPath, checkValid=True):
     nSamples = cnt - 1
     cache["num-samples".encode()] = str(nSamples).encode()
     writeCache(env, cache)
+    write_txt(lexicon,outputPath+"/dict")
+    print(lexicon)
     print("Created dataset with %d samples" % nSamples)
 
 
@@ -222,4 +249,7 @@ def createDataset_with_ValidTestset(
 
 
 if __name__ == "__main__":
-    fire.Fire(createDataset)
+    root_path = "../dataset/MLT2019/"
+    for lan in lan_list:
+        createDataset(inputPath=root_path+"train", gtFile=root_path+"train/gt.txt", outputPath=root_path+"mlt_2019_train_{}".format(lan), checkValid=True,lan_lmdb=lan)
+    # fire.Fire(createDataset)
