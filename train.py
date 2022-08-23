@@ -2,21 +2,20 @@ import os
 import sys
 import time
 import random
-import string
 import argparse
 
+print(os.getcwd()) #打印出当前工作路径
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn.init as init
 import torch.utils.data
-import torch.nn.functional as F
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from utils import CTCLabelConverter, AttnLabelConverter, Averager, adjust_learning_rate
-from dataset import hierarchical_dataset, AlignCollate, Batch_Balanced_Dataset
-from model import Model
+from data.dataset import hierarchical_dataset, AlignCollate, Batch_Balanced_Dataset
+from modules.model import Model
 from test import validation, benchmark_all_eval
 from modules.semi_supervised import PseudoLabelLoss, MeanTeacherLoss
 
@@ -462,12 +461,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--train_data",
-        default="data_CVPR2021/training/label/",
+        # default="data_CVPR2021/training/label/",
+        default="../dataset/MLT2017/val_gt/mlt_2017_val",
         help="path to training dataset",
     )
     parser.add_argument(
         "--valid_data",
-        default="data_CVPR2021/validation/",
+        default="../dataset/MLT2017/val_gt/mlt_2017_val",
         help="path to validation dataset",
     )
     parser.add_argument(
@@ -556,12 +556,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--select_data",
         type=str,
-        default="label",
+        # default="label",
+        default="../dataset/MLT2017/val_gt/mlt_2017_val",
         help="select training data. default is `label` which means 11 real labeled datasets",
     )
     parser.add_argument(
         "--batch_ratio",
         type=str,
+        default="1.0",
         help="assign ratio for each selected data in the batch",
     )
     parser.add_argument(
