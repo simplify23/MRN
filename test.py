@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import string
 import argparse
 import re
 from datetime import date
@@ -11,12 +10,13 @@ import torch.backends.cudnn as cudnn
 import torch.utils.data
 import torch.nn.functional as F
 import numpy as np
+from mmcv import Config
 from nltk.metrics.distance import edit_distance
 from tqdm import tqdm
 
 from utils import CTCLabelConverter, AttnLabelConverter, Averager
-from dataset import hierarchical_dataset, AlignCollate
-from model import Model
+from data.dataset import hierarchical_dataset, AlignCollate
+from modules.model import Model
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -47,6 +47,11 @@ def benchmark_all_eval(model, criterion, converter, opt, calculate_infer_time=Fa
             "11.ReCTS",
         ]
         opt.eval_data = "data_CVPR2021/evaluation/addition/"
+    elif opt.eval_type == "IL_STR":
+        """evaluation with IL_STR datasets"""
+        eval_data_list = ["Latin", "Chinese", "Arabic", "Japanese", "Korean", "Bangla", "Hindi", "Symbols"]
+
+        opt.eval_data = "../dataset/MLT2017/mlt_2017_train_"
 
     if calculate_infer_time:
         eval_batch_size = (
@@ -64,7 +69,8 @@ def benchmark_all_eval(model, criterion, converter, opt, calculate_infer_time=Fa
     print(dashed_line)
     log.write(dashed_line + "\n")
     for eval_data in eval_data_list:
-        eval_data_path = os.path.join(opt.eval_data, eval_data)
+        eval_data_path= opt.eval_data+eval_data
+        # eval_data_path = os.path.join(opt.eval_data, eval_data)
         AlignCollate_eval = AlignCollate(opt, mode="test")
         eval_data, eval_data_log = hierarchical_dataset(
             root=eval_data_path, opt=opt, mode="test"
@@ -251,6 +257,14 @@ def validation(model, criterion, eval_loader, converter, opt, tqdm_position=1):
 
 def test(opt):
     """model configuration"""
+    opt.character = []
+    f = open(opt.train_data+"/dict.txt")
+    line = f.readline()
+    while line:
+        opt.character.append(line.strip("\n"))
+        # print(line)
+        line = f.readline()
+    f.close()
     if "CTC" in opt.Prediction:
         converter = CTCLabelConverter(opt.character)
     else:
@@ -340,6 +354,11 @@ def test(opt):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config",
+        default="config/crnn.py",
+        help="path to validation dataset",
+    )
     parser.add_argument("--eval_data", help="path to evaluation dataset")
     parser.add_argument(
         "--eval_type",
@@ -351,7 +370,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--batch_size", type=int, default=512, help="input batch size")
     parser.add_argument(
-        "--saved_model", required=True, help="path to saved_model to evaluation"
+        "--saved_model", help="path to saved_model to evaluation"
     )
     parser.add_argument(
         "--log_multiple_test", action="store_true", help="log_multiple_test"
@@ -388,7 +407,7 @@ if __name__ == "__main__":
         help="whether to use semi-supervised learning |None|PL|MT|",
     )
     """ Model Architecture """
-    parser.add_argument("--model_name", type=str, required=True, help="CRNN|TRBA")
+    parser.add_argument("--model_name", type=str, help="CRNN|TRBA")
     parser.add_argument(
         "--num_fiducial",
         type=int,
@@ -411,8 +430,23 @@ if __name__ == "__main__":
         "--hidden_size", type=int, default=256, help="the size of the LSTM hidden state"
     )
 
-    opt = parser.parse_args()
+    arg = parser.parse_args()
+    cfg = Config.fromfile(arg.config)
+    # optcfg.model
+    # opt.update(arg)
+    # cfg.merge_from_dict(cfg.model)
+    # opt.merge_from_dict(cfg.train)
+    # opt.merge_from_dict(cfg.optimizer)
 
+    opt = {}
+    opt.update(cfg.common)
+    opt.update(cfg.model)
+    opt.update(cfg.train)
+    opt.update(cfg.optimizer)
+    opt.update(cfg.test)
+    opt = argparse.Namespace(**opt)
+    # opt.saved_model=cfg.test.saved_model
+    # print(cfg.test.saved_model)
     if opt.model_name == "CRNN":
         opt.Transformation = "None"
         opt.FeatureExtraction = "VGG"

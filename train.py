@@ -2,7 +2,6 @@ import os
 import sys
 import time
 import random
-import string
 import argparse
 
 print(os.getcwd()) #打印出当前工作路径
@@ -10,14 +9,14 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.nn.init as init
 import torch.utils.data
-import torch.nn.functional as F
 import numpy as np
+from mmcv import Config
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from utils import CTCLabelConverter, AttnLabelConverter, Averager, adjust_learning_rate
-from dataset import hierarchical_dataset, AlignCollate, Batch_Balanced_Dataset
-from model import Model
+from data.dataset import hierarchical_dataset, AlignCollate, Batch_Balanced_Dataset
+from modules.model import Model
 from test import validation, benchmark_all_eval
 from modules.semi_supervised import PseudoLabelLoss, MeanTeacherLoss
 
@@ -90,12 +89,21 @@ def train(opt, log):
     # set batch_ratio for each data.
     if opt.batch_ratio:
         batch_ratio = opt.batch_ratio.split("-")
+        # batch_ratio = opt.batch_ratio
     else:
         batch_ratio = [round(1 / len(select_data), 3)] * len(select_data)
 
     train_loader = Batch_Balanced_Dataset(
         opt, opt.train_data, select_data, batch_ratio, log
     )
+    opt.character = []
+    f = open(opt.train_data+"/dict.txt")
+    line = f.readline()
+    while line:
+        opt.character.append(line.strip("\n"))
+        # print(line)
+        line = f.readline()
+    f.close()
 
     if opt.semi != "None":
         select_data_unlabel = ["U1.Book32", "U2.TextVQA", "U3.STVQA"]
@@ -129,12 +137,6 @@ def train(opt, log):
     log.write("-" * 80 + "\n")
 
     """ model configuration """
-    lexicon=[]
-    with open("../dataset/MLT2017/mlt_2017_train_Latin/dict.txt", "r") as f:
-        for line in f.readlines():
-            lexicon.append(line.strip('\n'))  # 去掉列表中每一个元素的换行符
-            print(line)
-    opt.character = lexicon
     if "CTC" in opt.Prediction:
         converter = CTCLabelConverter(opt.character)
     else:
@@ -446,7 +448,7 @@ def train(opt, log):
     # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
     model.load_state_dict(torch.load(f"{saved_best_model}"))
 
-    opt.eval_type = "benchmark"
+    # opt.eval_type = "benchmark"
     model.eval()
     with torch.no_grad():
         total_accuracy, eval_data_list, accuracy_list = benchmark_all_eval(
@@ -468,9 +470,14 @@ def train(opt, log):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--config",
+        default="config/crnn.py",
+        help="path to validation dataset",
+    )
+    parser.add_argument(
         "--train_data",
         # default="data_CVPR2021/training/label/",
-        default="../dataset/MLT2017/mlt_2017_train_Latin",
+        default="../dataset/MLT2017/val_gt/mlt_2017_val",
         help="path to training dataset",
     )
     parser.add_argument(
@@ -479,16 +486,16 @@ if __name__ == "__main__":
         help="path to validation dataset",
     )
     parser.add_argument(
-        "--workers", type=int, default=8, help="number of data loading workers"
+        "--workers", type=int, default=4, help="number of data loading workers"
     )
-    parser.add_argument("--batch_size", type=int, default=384, help="input batch size")
+    parser.add_argument("--batch_size", type=int, default=128, help="input batch size")
     parser.add_argument(
         "--num_iter", type=int, default=200000, help="number of iterations to train for"
     )
     parser.add_argument(
         "--val_interval",
         type=int,
-        default=5000,
+        default=2000,
         help="Interval between each validation",
     )
     parser.add_argument(
@@ -538,7 +545,7 @@ if __name__ == "__main__":
         help="lr_drop_rate. default is the same setting with ASTER",
     )
     """ Model Architecture """
-    parser.add_argument("--model_name", type=str, required=True, help="CRNN|TRBA")
+    parser.add_argument("--model_name", type=str, required=False, help="CRNN|TRBA")
     parser.add_argument(
         "--num_fiducial",
         type=int,
@@ -548,7 +555,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--input_channel",
         type=int,
-        default=4,
+        default=3,
         help="the number of input channel of Feature extractor",
     )
     parser.add_argument(
@@ -565,8 +572,7 @@ if __name__ == "__main__":
         "--select_data",
         type=str,
         # default="label",
-        default="../dataset/MLT2017/mlt_2017_train_Latin",
-        # default="../dataset/MLT2017/val_gt/mlt_2017_val",
+        default="../dataset/MLT2017/val_gt/mlt_2017_val",
         help="select training data. default is `label` which means 11 real labeled datasets",
     )
     parser.add_argument(
@@ -636,7 +642,22 @@ if __name__ == "__main__":
         "--saved_model", default="", help="path to model to continue training"
     )
 
-    opt = parser.parse_args()
+    arg = parser.parse_args()
+    cfg = Config.fromfile(arg.config)
+    # optcfg.model
+    # opt.update(arg)
+    # cfg.merge_from_dict(cfg.model)
+    # opt.merge_from_dict(cfg.train)
+    # opt.merge_from_dict(cfg.optimizer)
+
+    opt={}
+    opt.update(cfg.common)
+    opt.update(cfg.test)
+    opt.update(cfg.model)
+    opt.update(cfg.train)
+    opt.update(cfg.optimizer)
+
+    opt = argparse.Namespace(**opt)
 
     if opt.model_name == "CRNN":  # CRNN = NVBC
         opt.Transformation = "None"
