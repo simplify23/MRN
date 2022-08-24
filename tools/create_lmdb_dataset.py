@@ -8,6 +8,9 @@ import numpy as np
 from tqdm import tqdm
 lan_list = ["Latin", "Chinese", "Arabic", "Japanese", "Korean", "Bangla","Hindi","Symbols"]
 
+def is_test(cnt,rad_list):
+    return rad_list[cnt%10]==1
+
 
 def checkImageIsValid(imageBin):
     if imageBin is None:
@@ -39,6 +42,107 @@ def write_txt(lexicon, name):
         file_write_obj.writelines(key)
         file_write_obj.write('\n')
     file_write_obj.close()
+
+def create_train_test_Dataset(inputPath, gtFile, outputPath,outputPath2, checkValid=True,lan_lmdb=None):
+    """a modified version of CRNN torch repository https://github.com/bgshih/crnn/blob/master/tool/create_dataset.py
+    Create LMDB dataset for training and evaluation.
+    ARGS:
+        inputPath  : input folder path where starts imagePath
+        outputPath : LMDB output path
+        gtFile     : list of image path and label
+        checkValid : if true, check the validity of every image
+    """
+    # CAUTION: if outputPath (lmdb) already exists, this function add dataset
+    # into it. so remove former one and re-create lmdb.
+    if os.path.exists(outputPath):
+        os.system(f"rm -r {outputPath}")
+
+    os.makedirs(outputPath, exist_ok=True)
+    env = lmdb.open(outputPath, map_size=80 * 2 ** 30)
+    cache = {}
+    cnt = 1
+    lexicon=set()
+
+    if os.path.exists(outputPath2):
+        os.system(f"rm -r {outputPath2}")
+
+    os.makedirs(outputPath2, exist_ok=True)
+    env2 = lmdb.open(outputPath2, map_size=80 * 2 ** 30)
+    cache2 = {}
+    rad_num = [i for i in range(10)]
+    random.shuffle(rad_num)
+    cnt_test=1
+
+    with open(gtFile, "r", encoding="utf-8-sig") as data:
+        datalist = data.readlines()
+
+    nSamples = len(datalist)
+    for i in tqdm(range(nSamples), total=nSamples, position=0, leave=True):
+        # imagePath, label = datalist[i].strip("\n").split("\t")
+        imagePath, lan, label = datalist[i].strip("\n").split(",", 2)
+        if lan_lmdb != None:
+            if lan !=lan_lmdb:
+                continue
+        imagePath = os.path.join(inputPath, imagePath)
+
+        # # only use alphanumeric data
+        # if re.search('[^a-zA-Z0-9]', label):
+        #     continue
+
+
+        if not os.path.exists(imagePath):
+            print("%s does not exist" % imagePath)
+            continue
+        with open(imagePath, "rb") as f:
+            imageBin = f.read()
+        if checkValid:
+            try:
+                if not checkImageIsValid(imageBin):
+                    print("%s is not a valid image" % imagePath)
+                    continue
+            except:
+                print("error occured", i)
+                with open(outputPath + "/error_image_log.txt", "a") as log:
+                    log.write("%s-th image data occured error\n" % str(i))
+                continue
+
+        imageKey = "image-%09d".encode() % cnt
+        imagepathKey = "imagepath-%09d".encode() % cnt
+        labelKey = "label-%09d".encode() % cnt
+
+        if is_test(cnt,rad_num):
+            cache2[imageKey] = imageBin
+            cache2[labelKey] = label.encode()
+            cache2[imagepathKey] = imagePath.encode()
+            cnt_test+=1
+        else:
+            cache[imageKey] = imageBin
+            cache[labelKey] = label.encode()
+            cache[imagepathKey] = imagePath.encode()
+
+        if cnt % 10 == 0:
+            random.shuffle(rad_num)
+
+        # print(label)
+        # label = label.decode('utf-8')
+        for char in label:
+            lexicon.add(char)
+
+        if cnt % 1000 == 0:
+            writeCache(env, cache)
+            cache = {}
+            writeCache(env2, cache2)
+            cache2 = {}
+            # print("test sample {}".format(cnt_test))
+            # print('Written %d / %d' % (cnt, nSamples))
+        cnt += 1
+    nSamples = cnt - 1
+    cache["num-samples".encode()] = str(nSamples).encode()
+    writeCache(env, cache)
+    write_txt(lexicon,outputPath+"/dict")
+    print(lexicon)
+    print("Created dataset with %d samples" % nSamples)
+    print("Created dataset with %d test samples" % (cnt_test-1))
 
 def createDataset(inputPath, gtFile, outputPath, checkValid=True,lan_lmdb=None):
     """a modified version of CRNN torch repository https://github.com/bgshih/crnn/blob/master/tool/create_dataset.py
@@ -251,5 +355,8 @@ def createDataset_with_ValidTestset(
 if __name__ == "__main__":
     root_path = "../dataset/MLT2019/"
     for lan in lan_list:
-        createDataset(inputPath=root_path+"train", gtFile=root_path+"train/gt.txt", outputPath=root_path+"mlt_2019_train_{}".format(lan), checkValid=True,lan_lmdb=lan)
+        # createDataset(inputPath=root_path+"train", gtFile=root_path+"train/gt.txt", outputPath=root_path+"mlt_2019_train_{}".format(lan), checkValid=True,lan_lmdb=lan)
+        create_train_test_Dataset(inputPath=root_path + "train", gtFile=root_path + "train/gt.txt",
+                      outputPath=root_path + "mlt_2019_train_{}".format(lan), outputPath2=root_path + "mlt_2019_test_{}".format(lan),
+                      checkValid=True, lan_lmdb=lan)
     # fire.Fire(createDataset)

@@ -51,7 +51,7 @@ def benchmark_all_eval(model, criterion, converter, opt, calculate_infer_time=Fa
         """evaluation with IL_STR datasets"""
         eval_data_list = ["Latin", "Chinese", "Arabic", "Japanese", "Korean", "Bangla", "Hindi", "Symbols"]
 
-        opt.eval_data = "../dataset/MLT2017/mlt_2017_train_"
+        opt.eval_data = "../dataset/MLT2017/test_2017/mlt_2017_val_"
 
     if calculate_infer_time:
         eval_batch_size = (
