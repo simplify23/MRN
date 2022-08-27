@@ -40,10 +40,10 @@ train = dict(
     saved_model="",  # "path to model to continue training"
     Aug="None",  # |None|Blur|Crop|Rot|ABINet
     workers=4,
-    train_data="/share/test/ztl/IL/MLT17_IL/train_2017",
-    valid_data="/share/test/ztl/IL/MLT17_IL/test_2017",
-    lan_list=["Chinese", "Arabic", "Latin", "Japanese", "Korean", "Bangla", "Symbols"],
-    root_pefix="mlt_2017",
+    train_data="../dataset/chinese/RCTW/train",
+    # train_data="../dataset/MLT2019/train_2019/mlt_2019_train_Latin",
+    valid_data="../dataset/chinese/RCTW/test",
+    # valid_data="../dataset/MLT2019/test_2019/mlt_2019_test_Latin",
     select_data="/",
     batch_ratio="1.0",
     total_data_usage_ratio="1.0",
@@ -63,7 +63,7 @@ train = dict(
 
 
 test=dict(
-    eval_data="/share/test/ztl/IL/MLT17_IL/",
+    eval_data="../dataset/MLT2017/",
     eval_type="IL_STR",
     workers=4,
     batch_size=256,
