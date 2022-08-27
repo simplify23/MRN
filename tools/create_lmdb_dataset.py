@@ -72,11 +72,13 @@ def create_train_test_Dataset(inputPath, gtFile, outputPath,outputPath2, checkVa
     rad_num = [i for i in range(10)]
     random.shuffle(rad_num)
     cnt_test=1
+    cnt_train=1
+
 
     with open(gtFile, "r", encoding="utf-8-sig") as data:
         datalist = data.readlines()
-
     nSamples = len(datalist)
+
     for i in tqdm(range(nSamples), total=nSamples, position=0, leave=True):
         # imagePath, label = datalist[i].strip("\n").split("\t")
         imagePath, lan, label = datalist[i].strip("\n").split(",", 2)
@@ -111,14 +113,19 @@ def create_train_test_Dataset(inputPath, gtFile, outputPath,outputPath2, checkVa
         labelKey = "label-%09d".encode() % cnt
 
         if is_test(cnt,rad_num):
-            cache2[imageKey] = imageBin
-            cache2[labelKey] = label.encode()
-            cache2[imagepathKey] = imagePath.encode()
+            t_image = "image-%09d".encode() % (cnt_test)
+            t_label = "label-%09d".encode() % (cnt_test)
+            cache2[t_image] = imageBin
+            cache2[t_label] = label.encode()
+            # cache2[imagepathKey] = imagePath.encode()
             cnt_test+=1
         else:
-            cache[imageKey] = imageBin
-            cache[labelKey] = label.encode()
-            cache[imagepathKey] = imagePath.encode()
+            t_image = "image-%09d".encode() % (cnt_train)
+            t_label = "label-%09d".encode() % (cnt_train)
+            cache2[t_image] = imageBin
+            cache2[t_label] = label.encode()
+            # cache[imagepathKey] = imagePath.encode()
+            cnt_train+=1
 
         if cnt % 10 == 0:
             random.shuffle(rad_num)
@@ -137,11 +144,106 @@ def create_train_test_Dataset(inputPath, gtFile, outputPath,outputPath2, checkVa
             # print('Written %d / %d' % (cnt, nSamples))
         cnt += 1
     nSamples = cnt - 1
-    cache["num-samples".encode()] = str(nSamples).encode()
+    cache["num-samples".encode()] = str(cnt_train).encode()
     writeCache(env, cache)
+    cache2["num-samples".encode()] = str(cnt_test).encode()
+    writeCache(env2, cache2)
     write_txt(lexicon,outputPath+"/dict")
     print(lexicon)
-    print("Created dataset with %d samples" % nSamples)
+    print("Created dataset with %d train samples" % (cnt_train-1))
+    print("Created dataset with %d test samples" % (cnt_test-1))
+
+def create_from_lmdb_train_test_Dataset(inputPath, gtFile, outputPath,outputPath2, checkValid=True,lan_lmdb=None):
+    """a modified version of CRNN torch repository https://github.com/bgshih/crnn/blob/master/tool/create_dataset.py
+    Create LMDB dataset for training and evaluation.
+    ARGS:
+        inputPath  : input folder path where starts imagePath
+        outputPath : LMDB output path
+        gtFile     : list of image path and label
+        checkValid : if true, check the validity of every image
+    """
+    # CAUTION: if outputPath (lmdb) already exists, this function add dataset
+    # into it. so remove former one and re-create lmdb.
+    if os.path.exists(outputPath):
+        os.system(f"rm -r {outputPath}")
+
+    os.makedirs(outputPath, exist_ok=True)
+    env = lmdb.open(outputPath, map_size=80 * 2 ** 30)
+    cache = {}
+    cnt = 1
+    lexicon=set()
+
+    if os.path.exists(outputPath2):
+        os.system(f"rm -r {outputPath2}")
+
+    os.makedirs(outputPath2, exist_ok=True)
+    env2 = lmdb.open(outputPath2, map_size=80 * 2 ** 30)
+    cache2 = {}
+    rad_num = [i for i in range(10)]
+    random.shuffle(rad_num)
+    cnt_test=1
+    cnt_train=1
+
+    env_in = lmdb.open(inputPath, readonly=True) # 打开文件
+    txn_in = env_in.begin() # 生成处理句柄
+    cur_in = txn_in.cursor() # 生成迭代器指针
+    nSamples = int(txn_in.get('num-samples'.encode()))
+    print("total sampler:{}".format(nSamples))
+
+
+    for i in tqdm(range(nSamples), total=nSamples, position=0, leave=True):
+        # imagePath, label = datalist[i].strip("\n").split("\t")
+        #label_key = 'label-%09d' % (index + 1)
+        # text = cur.get(label_key.encode())
+        #label = str(txn.get(label_key.encode()).decode('utf-8'))
+
+        imageKey = "image-%09d".encode() % (i+1)
+        # imagepathKey = "imagepath-%09d".encode() % cnt
+        labelKey = "label-%09d".encode() % (i+1)
+
+        label = txn_in.get(labelKey)
+        image = txn_in.get(imageKey)
+
+        if is_test(cnt,rad_num):
+            t_image = "image-%09d".encode() % (cnt_test)
+            t_label = "label-%09d".encode() % (cnt_test)
+            cache2[t_image] = image
+            cache2[t_label] = label
+            # cache2[imagepathKey] = imagePath.encode()
+            cnt_test+=1
+        else:
+            t_image = "image-%09d".encode() % (cnt_train)
+            t_label = "label-%09d".encode() % (cnt_train)
+            cache2[t_image] = image
+            cache2[t_label] = label
+            # cache[imagepathKey] = imagePath.encode()
+            cnt_train+=1
+
+        if cnt % 10 == 0:
+            random.shuffle(rad_num)
+
+        # print(label)
+        # label = label.decode('utf-8')
+        for char in label.decode('utf-8'):
+            lexicon.add(char)
+
+        if cnt % 1000 == 0:
+            writeCache(env, cache)
+            cache = {}
+            writeCache(env2, cache2)
+            cache2 = {}
+            # print("test sample {}".format(cnt_test))
+            # print('Written %d / %d' % (cnt, nSamples))
+        cnt += 1
+    nSamples = cnt - 1
+    cache["num-samples".encode()] = str(cnt_train).encode()
+    writeCache(env, cache)
+    cache2["num-samples".encode()] = str(cnt_test).encode()
+    writeCache(env2, cache2)
+    print(lexicon)
+    write_txt(lexicon,outputPath+"/dict")
+    print(lexicon)
+    print("Created dataset with %d train samples" % (cnt_train-1))
     print("Created dataset with %d test samples" % (cnt_test-1))
 
 def createDataset(inputPath, gtFile, outputPath, checkValid=True,lan_lmdb=None):
@@ -353,10 +455,10 @@ def createDataset_with_ValidTestset(
 
 
 if __name__ == "__main__":
-    root_path = "../dataset/MLT2019/"
-    for lan in lan_list:
-        # createDataset(inputPath=root_path+"train", gtFile=root_path+"train/gt.txt", outputPath=root_path+"mlt_2019_train_{}".format(lan), checkValid=True,lan_lmdb=lan)
-        create_train_test_Dataset(inputPath=root_path + "train", gtFile=root_path + "train/gt.txt",
-                      outputPath=root_path + "mlt_2019_train_{}".format(lan), outputPath2=root_path + "mlt_2019_test_{}".format(lan),
-                      checkValid=True, lan_lmdb=lan)
+    # root_path = "../dataset/MLT2019/"
+    root_path = "../dataset/chinese/ArT_train"
+    print(root_path)
+    # for lan in lan_list:
+    #     createDataset(inputPath=root_path+"train", gtFile=root_path+"train/gt.txt", outputPath=root_path+"mlt_2019_train_{}".format(lan), checkValid=True,lan_lmdb=lan)
     # fire.Fire(createDataset)
+    create_from_lmdb_train_test_Dataset(inputPath=root_path,gtFile=None,outputPath=root_path+"train",outputPath2=root_path+"test", checkValid=True,lan_lmdb=None)
