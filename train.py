@@ -24,12 +24,15 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def train(opt, log):
-    ["Latin", "Chinese", "Arabic", "Japanese", "Korean", "Bangla","Hindi","Symbols"]
-    train_datasets = ["mlt_2017_train_Latin", "mlt_2017_train_Chinese", "mlt_2017_train_Arabic", "mlt_2017_train_Japanese", "mlt_2017_train_Korean", "mlt_2017_train_Bangla", "mlt_2017_train_Symbols"]
-    valid_datasets = ["mlt_2017_test_Latin", "mlt_2017_test_Chinese", "mlt_2017_test_Arabic", "mlt_2017_test_Japanese", "mlt_2017_test_Korean", "mlt_2017_test_Bangla", "mlt_2017_test_Symbols"]
-    
+    # ["Latin", "Chinese", "Arabic", "Japanese", "Korean", "Bangla","Hindi","Symbols"]
+    # train_datasets = ["mlt_2017_train_Latin", "mlt_2017_train_Chinese", "mlt_2017_train_Arabic", "mlt_2017_train_Japanese", "mlt_2017_train_Korean", "mlt_2017_train_Bangla", "mlt_2017_train_Symbols"]
+    # valid_datasets = ["mlt_2017_val_Latin", "mlt_2017_val_Chinese", "mlt_2017_val_Arabic", "mlt_2017_val_Japanese", "mlt_2017_val_Korean", "mlt_2017_val_Bangla", "mlt_2017_val_Symbols"]
+    train_datasets = [opt.root_pefix + "_train_" + lan for lan in opt.lan_list]
+    valid_datasets = [opt.root_pefix + "_test_" + lan for lan in opt.lan_list]
+
     best_scores = []
     valid_datas = []
+    char = dict()
     
     for taski in range(len(train_datasets)):
         train_data = os.path.join(opt.train_data, train_datasets[taski])
@@ -109,14 +112,23 @@ def train(opt, log):
             opt, train_data, select_data, batch_ratio, log
         )
         opt.character = []
+        ch_list = []
         f = open(train_data+"/dict.txt")
         line = f.readline()
         while line:
-            opt.character.append(line.strip("\n"))
+            ch_list.append(line.strip("\n"))
             # print(line)
             line = f.readline()
         f.close()
 
+        for ch in ch_list:
+            if char.get(ch,None) == None:
+                char[ch]=1
+        for key, value in char.items():
+            opt.character.append(key)
+        print("dict has {} number characters\n".format(len(opt.character)))
+        # print(opt.character)
+        # opt.character = char
         if opt.semi != "None":
             select_data_unlabel = ["U1.Book32", "U2.TextVQA", "U3.STVQA"]
             batch_ratio_unlabel = [round(1 / len(select_data_unlabel), 3)] * len(
@@ -252,8 +264,8 @@ def train(opt, log):
             )
         elif opt.optimizer == "adam":
             optimizer = torch.optim.Adam(filtered_parameters, lr=opt.lr)
-        print("Optimizer:")
-        print(optimizer)
+        # print("Optimizer:")
+        # print(optimizer)
         log.write(repr(optimizer) + "\n")
 
         if "super" in opt.schedule:
@@ -270,8 +282,8 @@ def train(opt, log):
                 final_div_factor=1000,
                 total_steps=opt.num_iter,
             )
-            print("Scheduler:")
-            print(scheduler)
+            # print("Scheduler:")
+            # print(scheduler)
             log.write(repr(scheduler) + "\n")
 
         """ final options """
@@ -284,7 +296,7 @@ def train(opt, log):
             else:
                 opt_log += f"{str(k)}: {str(v)}\n"
         opt_log += "---------------------------------------\n"
-        print(opt_log)
+        # print(opt_log)
         log.write(opt_log)
         
 
