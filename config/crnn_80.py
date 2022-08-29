@@ -36,11 +36,11 @@ optimizer=dict(
 
 """ Data processing """
 train = dict(
-    exp_name="CRNN_baseline",  # Where to store logs and models
+    exp_name="CRNN_19",  # Where to store logs and models
     saved_model="",  # "path to model to continue training"
     Aug="None",  # |None|Blur|Crop|Rot|ABINet
     workers=4,
-    lan_list=["Latin", "Chinese", "Arabic", "Japanese", "Korean", "Bangla","Symbols"],
+    lan_list=["Chinese", "Arabic", "Latin", "Japanese", "Korean", "Bangla","Symbols"],
     root_pefix = "mlt_2019",
     train_data = "../dataset/MLT2019/train_2019",
     # train_data="/share/test/ztl/IL/MLT17_IL/train_2017",
@@ -48,10 +48,10 @@ train = dict(
     select_data="/",
     batch_ratio="1.0",
     total_data_usage_ratio="1.0",
-    NED=None,
+    NED=True,
     batch_size=384,
-    num_iter=100,
-    val_interval=100,
+    num_iter=5000,
+    val_interval=2000,
     log_multiple_test=None,
     FT="init",
     grad_clip=5,
