@@ -167,6 +167,8 @@ def create_from_lmdb_train_test_Dataset(inputPath, gtFile, outputPath,outputPath
     """
     # CAUTION: if outputPath (lmdb) already exists, this function add dataset
     # into it. so remove former one and re-create lmdb.
+    lexicon = set()
+
     if os.path.exists(outputPath):
         os.system(f"rm -r {outputPath}")
 
@@ -174,7 +176,7 @@ def create_from_lmdb_train_test_Dataset(inputPath, gtFile, outputPath,outputPath
     env = lmdb.open(outputPath, map_size=80 * 2 ** 30)
     cache = {}
     cnt = 1
-    lexicon=set()
+
 
     if os.path.exists(outputPath2):
         os.system(f"rm -r {outputPath2}")
@@ -189,7 +191,7 @@ def create_from_lmdb_train_test_Dataset(inputPath, gtFile, outputPath,outputPath
 
     env_in = lmdb.open(inputPath, readonly=True) # 打开文件
     txn_in = env_in.begin() # 生成处理句柄
-    cur_in = txn_in.cursor() # 生成迭代器指针
+    # cur_in = txn_in.cursor() # 生成迭代器指针
     nSamples = int(txn_in.get('num-samples'.encode()))
     print("total sampler:{}".format(nSamples))
 
@@ -210,8 +212,8 @@ def create_from_lmdb_train_test_Dataset(inputPath, gtFile, outputPath,outputPath
         if is_test(cnt,rad_num):
             t_image = "image-%09d".encode() % (cnt_test)
             t_label = "label-%09d".encode() % (cnt_test)
-            print(label.decode("utf-8"))
-            print(t_label.decode("utf-8"))
+            # print(label.decode("utf-8"))
+            # print(t_label.decode("utf-8"))
             cache2[t_image] = image
             cache2[t_label] = label
             # cache2[imagepathKey] = imagePath.encode()
@@ -246,11 +248,12 @@ def create_from_lmdb_train_test_Dataset(inputPath, gtFile, outputPath,outputPath
     writeCache(env, cache)
     cache2["num-samples".encode()] = str(cnt_test).encode()
     writeCache(env2, cache2)
+    print("Created dataset with %d train samples" % (cnt_train))
+    print("Created dataset with %d test samples" % (cnt_test))
+
     print(lexicon)
     write_txt(lexicon,outputPath+"/dict")
     # print(lexicon)
-    print("Created dataset with %d train samples" % (cnt_train))
-    print("Created dataset with %d test samples" % (cnt_test))
 
 def createDataset(inputPath, gtFile, outputPath, checkValid=True,lan_lmdb=None):
     """a modified version of CRNN torch repository https://github.com/bgshih/crnn/blob/master/tool/create_dataset.py
@@ -467,11 +470,12 @@ if __name__ == "__main__":
     # print(root_path)
     # for lan in lan_list:
     #     create_train_test_Dataset(inputPath=root_path+"train", gtFile=root_path+"train/gt.txt",
-    #                               outputPath=root_path+"mlt_2019_train_{}".format(lan),
-    #                               outputPath2=root_path + "mlt_2019_test_{}".format(lan),
+    #                               outputPath=root_path+"train_2019/mlt_2019_train_{}".format(lan),
+    #                               outputPath2=root_path + "test_2019/mlt_2019_test_{}".format(lan),
     #                               checkValid=True,lan_lmdb=lan)
         # createDataset(inputPath=root_path+"train", gtFile=root_path+"train/gt.txt", outputPath=root_path+"mlt_2019_train_{}".format(lan), checkValid=True,lan_lmdb=lan)
     # fire.Fire(createDataset)
+    chi_list=["CTW"]
     for path in chi_list:
         total_path = root_path + path
         create_from_lmdb_train_test_Dataset(inputPath=total_path+"_train",gtFile=None,outputPath=total_path+"/train",outputPath2=total_path+"/test", checkValid=True,lan_lmdb=None)

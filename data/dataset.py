@@ -250,9 +250,9 @@ class LmdbDataset(Dataset):
             for index in range(self.nSamples):
                 index += 1  # lmdb starts with 1
                 label_key = "label-%09d".encode() % index
-                print(label_key)
+                # print(label_key)
                 label = txn.get(label_key).decode("utf-8")
-                print(label)
+                # print(label)
 
                 # length filtering
                 length_of_label = len(label)
