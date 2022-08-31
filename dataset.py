@@ -15,8 +15,6 @@ from torch.utils.data import Dataset, ConcatDataset, Subset
 from torch._utils import _accumulate
 import torchvision.transforms as transforms
 
-from data.transform import CVGeometry, CVDeterioration, CVColorJitter
-
 
 class Batch_Balanced_Dataset(object):
     def __init__(
@@ -245,14 +243,11 @@ class LmdbDataset(Dataset):
 
         with self.env.begin(write=False) as txn:
             self.nSamples = int(txn.get("num-samples".encode()))
-            print(self.nSamples)
             self.filtered_index_list = []
             for index in range(self.nSamples):
                 index += 1  # lmdb starts with 1
                 label_key = "label-%09d".encode() % index
-                # print(label_key)
                 label = txn.get(label_key).decode("utf-8")
-                # print(label)
 
                 # length filtering
                 length_of_label = len(label)
@@ -374,16 +369,6 @@ class AlignCollate(object):
 
         if opt.Aug == "None" or mode != "train":
             self.transform = ResizeNormalize((opt.imgW, opt.imgH))
-        elif opt.Aug == "ABINet" and mode == "train":
-            self.transform = transforms.Compose([
-                CVGeometry(degrees=45, translate=(0.0, 0.0), scale=(0.5, 2.), shear=(45, 15), distortion=0.5, p=0.5),
-                CVDeterioration(var=20, degrees=6, factor=4, p=0.25),
-                CVColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1, p=0.25),
-                transforms.Resize(
-                        (self.opt.imgH, self.opt.imgW), interpolation=PIL.Image.BICUBIC
-                ),
-                transforms.ToTensor(),
-            ])
         else:
             self.transform = Text_augment(opt)
 

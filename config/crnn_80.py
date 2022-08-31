@@ -1,7 +1,7 @@
 common=dict(
     batch_max_length = 25,
     imgH = 32,
-    imgW = 100,
+    imgW = 256,
     manual_seed=111,
     # character="../dataset/MLT2017/val_gt/mlt_2017_val",
 )
@@ -36,21 +36,25 @@ optimizer=dict(
 
 """ Data processing """
 train = dict(
-    exp_name="CRNN_baseline",  # Where to store logs and models
+    exp_name="CRNN_chinese",  # Where to store logs and models
     saved_model="",  # "path to model to continue training"
     Aug="None",  # |None|Blur|Crop|Rot|ABINet
     workers=4,
-    train_data="/share/test/ztl/IL/MLT17_IL/train_2017",
-    valid_data="/share/test/ztl/IL/MLT17_IL/test_2017",
-    lan_list=["Chinese", "Arabic", "Latin", "Japanese", "Korean", "Bangla", "Symbols"],
-    root_pefix="mlt_2017",
+    ch_list = ["ArT","RCTW","ReCTS","LSVT","CTW"],
+    lan_list=["Chinese", "Arabic",  "Japanese", "Korean", "Bangla","Latin","Symbols"],
+    root_pefix = "mlt_2019",
+    # train_data = "../dataset/MLT2019/train_2019",
+    # # train_data="/share/test/ztl/IL/MLT17_IL/train_2017",
+    # valid_data="../dataset/MLT2019/test_2019",
+    train_data="../dataset/chinese",
+    valid_data="../dataset/chinese",
     select_data="/",
     batch_ratio="1.0",
     total_data_usage_ratio="1.0",
-    NED=None,
-    batch_size=384,
-    num_iter=100000,
-    val_interval=2000,
+    NED=False,
+    batch_size=256,
+    num_iter=40000,
+    val_interval=10000,
     log_multiple_test=None,
     FT="init",
     grad_clip=5,
