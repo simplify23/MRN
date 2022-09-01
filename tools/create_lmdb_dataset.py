@@ -6,8 +6,7 @@ import lmdb
 import cv2
 import numpy as np
 from tqdm import tqdm
-lan_list = ["Chinese", "Arabic", "Japanese", "Korean", "Bangla","Hindi","Latin","Symbols"]
-lan_list = ["Korean","Bangla","Hindi","Latin","Symbols"]
+lan_list = ["Latin", "Chinese", "Arabic", "Japanese", "Korean", "Bangla","Hindi","Symbols"]
 chi_list = ["ArT","RCTW","ReCTS","LSVT"]
 
 def is_test(cnt,rad_list):
@@ -19,12 +18,7 @@ def from_gt_file(gt_path,img_path):
     label_list = []
     for line in lines:
         line = line.strip()
-        # print(line)
-        str = line.split(" ",1)
-        if len(str)==1:
-            continue
-        else:
-            image, label=str[0],str[1]
+        image, label = line.split(" ",1)
         image_list.append(img_path+image)
         label_list.append(label)
 
@@ -573,13 +567,11 @@ if __name__ == "__main__":
     #     create_from_lmdb_train_test_Dataset(inputPath=total_path+"_train",gtFile=None,outputPath=total_path+"/train",outputPath2=total_path+"/test", checkValid=True,lan_lmdb=None)
 
     # SynthMLT
-    for lan in lan_list:
-        root_path = "/home/ztl/dataset/SynthMLT/"
-        gt_path= "{}txt/{}/label.txt".format(root_path, lan)
-        img_path="{}txt/{}/".format(root_path, lan)
-        imgList, labelList = from_gt_file(gt_path,img_path)
-        print("The length of the list is ", len(imgList))
+    gt_path="/home/ztl/dataset/SynthMLT/txt/Hindi/label.txt"
+    img_path="/home/ztl/dataset/SynthMLT/txt/Hindi/"
+    imgList, labelList = from_gt_file(gt_path,img_path)
+    print("The length of the list is ", len(imgList))
 
-        '''Input the address you want to generate the lmdb file.'''
-        createSynthMLTDataset(imgList, labelList,root_path+"lmdb/"+lan)
+    '''Input the address you want to generate the lmdb file.'''
+    createSynthMLTDataset(imgList, labelList,"/home/ztl/dataset/SynthMLT/lmdb/Hindi")
     # inputPath, gtFile, outputPath,
