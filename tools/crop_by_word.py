@@ -255,9 +255,25 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+def unzip(lan):
+    root_path = "../dataset/SynthMLT/"
+    img_path = "{}{}".format(root_path, lan)
+    gt_path = "{}{}_gt".format(root_path, lan)
+
+    if os.path.exists(img_path):
+        os.system(f"rm -r {img_path}")
+    cmd = "unzip -d {} {}.zip".format(img_path, img_path)
+    # os.popen(cmd)
+    os.system(cmd)
+
+    if os.path.exists(gt_path):
+        os.system(f"rm -r {gt_path}")
+    cmd = "unzip -d {} {}.zip".format(gt_path, gt_path)
+    os.system(cmd)
 
 def main():
     args = parse_args()
+    unzip(args.lan)
     # root_path = args.root_path + args.lan
     out_dir = args.root_path + args.out_dir if args.out_dir else args.root_path
     root_path = args.root_path + args.lan

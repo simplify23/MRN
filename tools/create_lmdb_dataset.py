@@ -567,11 +567,13 @@ if __name__ == "__main__":
     #     create_from_lmdb_train_test_Dataset(inputPath=total_path+"_train",gtFile=None,outputPath=total_path+"/train",outputPath2=total_path+"/test", checkValid=True,lan_lmdb=None)
 
     # SynthMLT
-    gt_path="/home/ztl/dataset/SynthMLT/txt/Hindi/label.txt"
-    img_path="/home/ztl/dataset/SynthMLT/txt/Hindi/"
-    imgList, labelList = from_gt_file(gt_path,img_path)
-    print("The length of the list is ", len(imgList))
+    for lan in lan_list:
+        root_path = "/home/ztl/dataset/SynthMLT/"
+        gt_path= "{}txt/{}/label.txt".format(root_path, lan)
+        img_path="{}txt/{}/".format(root_path, lan)
+        imgList, labelList = from_gt_file(gt_path,img_path)
+        print("The length of the list is ", len(imgList))
 
-    '''Input the address you want to generate the lmdb file.'''
-    createSynthMLTDataset(imgList, labelList,"/home/ztl/dataset/SynthMLT/lmdb/Hindi")
+        '''Input the address you want to generate the lmdb file.'''
+        createSynthMLTDataset(imgList, labelList,root_path+"lmdb/"+lan)
     # inputPath, gtFile, outputPath,
