@@ -51,7 +51,7 @@ def benchmark_all_eval(model, criterion, converter, opt, calculate_infer_time=Fa
         """evaluation with IL_STR datasets"""
         eval_data_list = ["Latin", "Chinese", "Arabic", "Japanese", "Korean", "Bangla", "Hindi", "Symbols"]
 
-        opt.eval_data = "../dataset/MLT2017/test_2017/mlt_2017_val_"
+        opt.eval_data = "../dataset/MLT2019/test_2019/"
 
     if calculate_infer_time:
         eval_batch_size = (
@@ -84,7 +84,7 @@ def benchmark_all_eval(model, criterion, converter, opt, calculate_infer_time=Fa
             pin_memory=True,
         )
 
-        _, accuracy_by_best_model, _, _, _, infer_time, length_of_data = validation(
+        _, accuracy_by_best_model, ned_score, _, _, _, infer_time, length_of_data = validation(
             model, criterion, eval_loader, converter, opt, tqdm_position=0
         )
         accuracy_list.append(f"{accuracy_by_best_model:0.2f}")
@@ -94,6 +94,8 @@ def benchmark_all_eval(model, criterion, converter, opt, calculate_infer_time=Fa
         log.write(eval_data_log)
         print(f"Acc {accuracy_by_best_model:0.2f}")
         log.write(f"Acc {accuracy_by_best_model:0.2f}\n")
+        print(f"Ned {ned_score:0.2f}")
+        log.write(f"Ned {ned_score:0.2f}\n")
         print(dashed_line)
         log.write(dashed_line + "\n")
 
@@ -228,9 +230,8 @@ def validation(model, criterion, eval_loader, converter, opt, tqdm_position=1):
                 else:
                     norm_ED += 1 - edit_distance(prd, gt) / len(prd)
 
-            else:
-                if prd == gt:
-                    n_correct += 1
+            if prd == gt:
+                n_correct += 1
 
             # calculate confidence score (= multiply of prd_max_prob)
             try:
@@ -239,15 +240,18 @@ def validation(model, criterion, eval_loader, converter, opt, tqdm_position=1):
                 confidence_score = 0  # for empty pred case, when prune after "end of sentence" token ([EOS])
             confidence_score_list.append(confidence_score)
 
+    ned_score=None
+
     if opt.NED:
         # ICDAR2019 Normalized Edit Distance. In web page, they report % of norm_ED (= norm_ED * 100).
-        score = norm_ED / float(length_of_data) * 100
-    else:
-        score = n_correct / float(length_of_data) * 100  # accuracy
+        ned_score = norm_ED / float(length_of_data) * 100
+
+    score = n_correct / float(length_of_data) * 100  # accuracy
 
     return (
         valid_loss_avg.val(),
         score,
+        ned_score,
         preds_str,
         confidence_score_list,
         labels,
@@ -344,12 +348,14 @@ def test(opt):
                 collate_fn=AlignCollate_eval,
                 pin_memory=True,
             )
-            _, score_by_best_model, _, _, _, _, _ = validation(
+            _, score_by_best_model, ned_score,_, _, _, _, _ = validation(
                 model, criterion, eval_loader, converter, opt
             )
             log.write(eval_data_log)
-            print(f"{score_by_best_model:0.2f}")
-            log.write(f"{score_by_best_model:0.2f}\n")
+            print(f"best acc score {score_by_best_model:0.2f}")
+            print(f"best ned score {ned_score:0.2f}")
+            log.write(f"best acc score{score_by_best_model:0.2f}\n")
+            log.write(f"best ned score{ned_score:0.2f}\n")
             log.close()
 
 

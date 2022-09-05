@@ -22,6 +22,35 @@ from modules.semi_supervised import PseudoLabelLoss, MeanTeacherLoss
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+def write_data_log(line,name=None):
+    '''
+
+    :param name:
+    :param line: list of the string [a,b,c]
+    :return:
+    '''
+    with open(f"data_any.txt", "a+") as log:
+        log.write(line)
+
+def load_dict(path,char):
+    ch_list = []
+    character = []
+    f = open(path + "/dict.txt")
+    line = f.readline()
+    while line:
+        ch_list.append(line.strip("\n"))
+        # print(line)
+        line = f.readline()
+    f.close()
+
+    for ch in ch_list:
+        if char.get(ch, None) == None:
+            char[ch] = 1
+    for key, value in char.items():
+        character.append(key)
+    print("dict has {} number characters\n".format(len(character)))
+    return character
+
 def build_arg(parser):
     parser.add_argument(
         "--config",
@@ -301,8 +330,11 @@ def train(opt, log):
     # ["Latin", "Chinese", "Arabic", "Japanese", "Korean", "Bangla","Hindi","Symbols"]
     # train_datasets = ["mlt_2017_train_Latin", "mlt_2017_train_Chinese", "mlt_2017_train_Arabic", "mlt_2017_train_Japanese", "mlt_2017_train_Korean", "mlt_2017_train_Bangla", "mlt_2017_train_Symbols"]
     # valid_datasets = ["mlt_2017_val_Latin", "mlt_2017_val_Chinese", "mlt_2017_val_Arabic", "mlt_2017_val_Japanese", "mlt_2017_val_Korean", "mlt_2017_val_Bangla", "mlt_2017_val_Symbols"]
-    train_datasets = [opt.root_pefix + "_train_" + lan for lan in opt.lan_list]
-    valid_datasets = [opt.root_pefix + "_test_" + lan for lan in opt.lan_list]
+    # train_datasets = [opt.root_pefix + "_train_" + lan for lan in opt.lan_list]
+    # valid_datasets = [opt.root_pefix + "_test_" + lan for lan in opt.lan_list]
+    write_data_log(f"---- {opt.exp_name} ----\n")
+    train_datasets = [lan for lan in opt.lan_list]
+    valid_datasets = [lan for lan in opt.lan_list]
     if opt.ch_list!=None:
         train_datasets = [ch+"/train" for ch in opt.ch_list]
         valid_datasets = [ch+"/test" for ch in opt.ch_list]
@@ -318,31 +350,7 @@ def train(opt, log):
 
 
         """dataset preparation"""
-        # train dataset. for convenience
-        if opt.select_data == "label":
-            select_data = [
-                "1.SVT",
-                "2.IIIT",
-                "3.IC13",
-                "4.IC15",
-                "5.COCO",
-                "6.RCTW17",
-                "7.Uber",
-                "8.ArT",
-                "9.LSVT",
-                "10.MLT19",
-                "11.ReCTS",
-            ]
-
-        elif opt.select_data == "synth":
-            select_data = ["MJ", "ST"]
-
-        elif opt.select_data == "synth_SA":
-            select_data = ["MJ", "ST", "SA"]
-            opt.batch_ratio = "0.4-0.4-0.2"  # same ratio with SCATTER paper.
-
-        else:
-            select_data = opt.select_data.split("-")
+        select_data = opt.select_data
 
         # set batch_ratio for each data.
         if opt.batch_ratio:
@@ -352,26 +360,33 @@ def train(opt, log):
             batch_ratio = [round(1 / len(select_data), 3)] * len(select_data)
 
         train_loader = Batch_Balanced_Dataset(
-            opt, train_data, select_data, batch_ratio, log
+            opt, train_data, select_data, batch_ratio, log,taski
         )
 
         #-------load char to dict --------#
-        opt.character = []
-        ch_list = []
-        f = open(train_data+"/dict.txt")
-        line = f.readline()
-        while line:
-            ch_list.append(line.strip("\n"))
-            # print(line)
-            line = f.readline()
-        f.close()
+        for data_path in opt.select_data:
+            if data_path=="/":
+                opt.character = load_dict(train_data,char)
+            else:
+                opt.character = load_dict(data_path+f"/{opt.lan_list[taski]}",char)
 
-        for ch in ch_list:
-            if char.get(ch,None) == None:
-                char[ch]=1
-        for key, value in char.items():
-            opt.character.append(key)
-        print("dict has {} number characters\n".format(len(opt.character)))
+        # load_dict(path,char)
+        # opt.character = []
+        # ch_list = []
+        # f = open(train_data+"/dict.txt")
+        # line = f.readline()
+        # while line:
+        #     ch_list.append(line.strip("\n"))
+        #     # print(line)
+        #     line = f.readline()
+        # f.close()
+        #
+        # for ch in ch_list:
+        #     if char.get(ch,None) == None:
+        #         char[ch]=1
+        # for key, value in char.items():
+        #     opt.character.append(key)
+        # print("dict has {} number characters\n".format(len(opt.character)))
         # print(opt.character)
         # opt.character = char
 
@@ -617,7 +632,7 @@ def train(opt, log):
     # )
 
 def val(model, criterion, valid_loader, converter, opt,optimizer,best_score,start_time,iteration,train_loss_avg,taski):
-    with open(f"./saved_models/{opt.exp_name}/log_train.txt", "a") as log1:
+    with open(f"./saved_models/{opt.exp_name}/log_train.txt", "a") as log:
         model.eval()
         with torch.no_grad():
             (
@@ -670,7 +685,8 @@ def val(model, criterion, valid_loader, converter, opt,optimizer,best_score,star
         predicted_result_log += f"{dashed_line}"
         valid_log = f"{valid_log}\n{predicted_result_log}"
         print(valid_log)
-        log1.write(valid_log + "\n")
+        log.write(valid_log + "\n")
+        write_data_log(f"Task {opt.lan_list[taski]} [{iteration}/{opt.num_iter}] : Score:{current_score} LR:{lr:0.7f}\n")
 
         # opt.writer.add_scalar(
         #     "train/train_loss", float(f"{train_loss_avg.val():0.5f}"), iteration
@@ -740,6 +756,7 @@ def test(AlignCollate_valid,valid_datas,model,criterion,converter,opt,best_score
     acc_log= f'Task {taski} Test Average Incremental Accuracy: {best_scores[taski]} \n Task {taski} Incremental Accuracy: {task_accs}'
     # acc_log = f'Task {taski} Test Average Incremental Accuracy: {best_scores[taski]} \n '
     # acc_log += f'Task {taski} Incremental Accuracy: {task_accs:.2f}'
+    write_data_log(f'Task {taski} Avg Acc: {best_scores[taski]} \n {task_accs}')
     print(acc_log)
     log.write(acc_log)
     return best_scores,log

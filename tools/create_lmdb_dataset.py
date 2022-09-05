@@ -6,7 +6,8 @@ import lmdb
 import cv2
 import numpy as np
 from tqdm import tqdm
-lan_list = ["Latin", "Chinese", "Arabic", "Japanese", "Korean", "Bangla","Hindi","Symbols"]
+lan_list = ["Chinese", "Arabic", "Japanese", "Korean", "Bangla","Hindi","Latin","Symbols"]
+lan_list = ["Korean","Bangla","Hindi","Latin","Symbols"]
 chi_list = ["ArT","RCTW","ReCTS","LSVT"]
 
 def is_test(cnt,rad_list):
@@ -18,7 +19,12 @@ def from_gt_file(gt_path,img_path):
     label_list = []
     for line in lines:
         line = line.strip()
-        image, label = line.split(" ",1)
+        # print(line)
+        str = line.split(" ",1)
+        if len(str)==1:
+            continue
+        else:
+            image, label=str[0],str[1]
         image_list.append(img_path+image)
         label_list.append(label)
 

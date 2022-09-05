@@ -20,7 +20,7 @@ from data.transform import CVGeometry, CVDeterioration, CVColorJitter
 
 class Batch_Balanced_Dataset(object):
     def __init__(
-        self, opt, dataset_root, select_data, batch_ratio, log, learn_type=None
+        self, opt, dataset_root, select_data, batch_ratio, log, taski,learn_type=None
     ):
         """
         Modulate the data ratio in the batch.
@@ -57,12 +57,21 @@ class Batch_Balanced_Dataset(object):
             _batch_size = max(round(self.opt.batch_size * float(batch_ratio_d)), 1)
             print(dashed_line)
             log.write(dashed_line + "\n")
-            _dataset, _dataset_log = hierarchical_dataset(
-                root=dataset_root,
-                opt=self.opt,
-                select_data=[selected_d],
-                data_type=data_type,
-            )
+            if data_type=="label" and selected_d !="/":
+                _dataset, _dataset_log = concat_dataset(
+                    root=dataset_root,
+                    opt=self.opt,
+                    select_data=[selected_d],
+                    data_type=data_type,
+                    taski=taski,
+                )
+            else:
+                _dataset, _dataset_log = hierarchical_dataset(
+                    root=dataset_root,
+                    opt=self.opt,
+                    select_data=[selected_d],
+                    data_type=data_type,
+                )
             total_number_dataset = len(_dataset)
             log.write(_dataset_log)
 
@@ -194,6 +203,42 @@ class Batch_Balanced_Dataset(object):
         balanced_batch_img2 = torch.cat(balanced_batch_img2, 0)
 
         return balanced_batch_img1, balanced_batch_img2
+
+def concat_dataset(root, opt, select_data="/", taski=0, data_type="label", mode="train"):
+    """select_data='/' contains all sub-directory of root directory"""
+    dataset_list = []
+    dataset_log = f"dataset_root:    {root}\t dataset: {select_data[0]}"
+    print(dataset_log)
+    dataset_log += "\n"
+    for dirpath in select_data:
+        dataset = LmdbDataset(dirpath+"/"+opt.lan_list[taski], opt, mode=mode)
+        sub_dataset_log = f"sub-directory:\t/{os.path.relpath(dirpath, root)}\t num samples: {len(dataset)}"
+        print(sub_dataset_log)
+        dataset_log += f"{sub_dataset_log}\n"
+        dataset_list.append(dataset)
+
+    # for dirpath, dirnames, filenames in os.walk(root + "/"):
+    #     if not dirnames:
+    #         select_flag = False
+    #         for selected_d in select_data:
+    #             if selected_d in dirpath:
+    #                 select_flag = True
+    #                 break
+    #
+    #         if select_flag:
+    #             if data_type == "label":
+    #                 dataset = LmdbDataset(dirpath, opt, mode=mode)
+    #             else:
+    #                 dataset = LmdbDataset_unlabel(dirpath, opt)
+    #             sub_dataset_log = f"sub-directory:\t/{os.path.relpath(dirpath, root)}\t num samples: {len(dataset)}"
+    #             print(sub_dataset_log)
+    #             dataset_log += f"{sub_dataset_log}\n"
+    #             dataset_list.append(dataset)
+
+    concatenated_dataset = ConcatDataset(dataset_list)
+
+    return concatenated_dataset, dataset_log
+
 
 
 def hierarchical_dataset(root, opt, select_data="/", data_type="label", mode="train"):
