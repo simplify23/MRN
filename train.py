@@ -197,6 +197,49 @@ def build_arg(parser):
     )
     return parser
 
+
+def change_model(opt, model):
+    """ model configuration """
+    model.module.reset_class(opt, device)
+
+    # data parallel for multi-GPU
+    model.train()
+    if opt.saved_model != "":
+        fine_tuning_log = f"### loading pretrained model from ./saved_models/{opt.exp_name}/{name}_{opt.taski}_best_score.pth \n"
+
+        if "MoCo" in opt.saved_model or "MoCo" in opt.self_pre:
+            pretrained_state_dict_qk = torch.load(f"./saved_models/{opt.exp_name}/{name}_{opt.taski}_best_score.pth")
+            pretrained_state_dict = {}
+            for name in pretrained_state_dict_qk:
+                if "encoder_q" in name:
+                    rename = name.replace("encoder_q.", "")
+                    pretrained_state_dict[rename] = pretrained_state_dict_qk[name]
+        else:
+            pretrained_state_dict = torch.load(f"./saved_models/{opt.exp_name}/{name}_{opt.taski}_best_score.pth")
+
+        for name, param in model.named_parameters():
+            try:
+                param.data.copy_(
+                    pretrained_state_dict[name].data
+                )  # load from pretrained model
+                if opt.FT == "freeze":
+                    param.requires_grad = False  # Freeze
+                    fine_tuning_log += f"pretrained layer (freezed): {name}\n"
+                else:
+                    fine_tuning_log += f"pretrained layer: {name}\n"
+            except:
+                fine_tuning_log += f"non-pretrained layer: {name}\n"
+
+
+
+        print(fine_tuning_log)
+
+    # print("Model:")
+    # print(model)
+    # log.write(repr(model) + "\n")
+    return model
+
+
 def build_model(opt, log):
     """ model configuration """
 
@@ -221,17 +264,17 @@ def build_model(opt, log):
     model = torch.nn.DataParallel(model).to(device)
     model.train()
     if opt.saved_model != "":
-        fine_tuning_log = f"### loading pretrained model from {opt.saved_model}\n"
+        fine_tuning_log = f"### loading pretrained model from ./saved_models/{opt.exp_name}/{name}_0_best_score.pth\n"
 
         if "MoCo" in opt.saved_model or "MoCo" in opt.self_pre:
-            pretrained_state_dict_qk = torch.load(opt.saved_model)
+            pretrained_state_dict_qk = torch.load(f"./saved_models/{opt.exp_name}/{name}_0_best_score.pth")
             pretrained_state_dict = {}
             for name in pretrained_state_dict_qk:
                 if "encoder_q" in name:
                     rename = name.replace("encoder_q.", "")
                     pretrained_state_dict[rename] = pretrained_state_dict_qk[name]
         else:
-            pretrained_state_dict = torch.load(opt.saved_model)
+            pretrained_state_dict = torch.load(f"./saved_models/{opt.exp_name}/{name}_0_best_score.pth")
 
         for name, param in model.named_parameters():
             try:
@@ -272,6 +315,7 @@ def train(opt, log):
         train_data = os.path.join(opt.train_data, train_datasets[taski])
         valid_data = os.path.join(opt.valid_data, valid_datasets[taski])
         valid_datas.append(valid_data)
+
 
         """dataset preparation"""
         # train dataset. for convenience
@@ -371,7 +415,10 @@ def train(opt, log):
             opt.eos_token_index = converter.dict["[EOS]"]
         opt.num_class = len(converter.character)
 
-        model, log = build_model(opt, log)
+        if taski > 0:
+            model = change_model(opt, model)
+        else:
+            model, log = build_model(opt, log)
 
         """ setup loss """
         if "CTC" in opt.Prediction:
@@ -596,7 +643,7 @@ def val(model, criterion, valid_loader, converter, opt,optimizer,best_score,star
                 name = opt.lan_list[taski]
             torch.save(
                 model.state_dict(),
-                f"./saved_models/{opt.exp_name}/{name}_best_score.pth",
+                f"./saved_models/{opt.exp_name}/{name}_{taski}_best_score.pth",
             )
 
         # validation log: loss, lr, score (accuracy or norm ED), time.
@@ -656,7 +703,7 @@ def test(AlignCollate_valid,valid_datas,model,criterion,converter,opt,best_score
         name = opt.ch_list[taski]
     else:
         name = opt.lan_list[taski]
-    saved_best_model = f"./saved_models/{opt.exp_name}/{name}_best_score.pth"
+    saved_best_model = f"./saved_models/{opt.exp_name}/{name}_{taski}_best_score.pth"
     # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
     model.load_state_dict(torch.load(f"{saved_best_model}"))
 
