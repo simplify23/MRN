@@ -101,6 +101,22 @@ class Model(nn.Module):
         #             self.SelfSL_FFN_input, 128
         #         )  # 128 is used for MoCo paper.
 
+    def reset_class(self, opt, device):
+
+        """Prediction"""
+        if opt.Prediction == "CTC":
+            self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
+        elif opt.Prediction == "Attn":
+            self.Prediction = Attention(
+                self.SequenceModeling_output, opt.hidden_size, opt.num_class
+            )
+        else:
+            raise Exception("Prediction is neither CTC or Attn")
+        
+        self.Prediction.to(device)
+    
+
+
     def forward(self, image, text=None, is_train=True, SelfSL_layer=False):
         """Transformation stage"""
         if not self.stages["Trans"] == "None":
