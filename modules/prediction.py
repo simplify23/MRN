@@ -6,14 +6,15 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class Attention(nn.Module):
-    def __init__(self, input_size, hidden_size, num_class, num_char_embeddings=256):
+    def __init__(self, input_size, hidden_size, num_class, fc, num_char_embeddings=256):
         super(Attention, self).__init__()
         self.attention_cell = AttentionCell(
             input_size, hidden_size, num_char_embeddings
         )
         self.hidden_size = hidden_size
         self.num_class = num_class
-        self.generator = nn.Linear(hidden_size, num_class)
+        self.generator = fc
+        # self.generator = nn.Linear(hidden_size, num_class)
         self.char_embeddings = nn.Embedding(num_class, num_char_embeddings)
 
     def forward(self, batch_H, text, is_train=True, batch_max_length=25):

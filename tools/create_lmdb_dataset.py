@@ -6,12 +6,29 @@ import lmdb
 import cv2
 import numpy as np
 from tqdm import tqdm
-lan_list = ["Latin", "Chinese", "Arabic", "Japanese", "Korean", "Bangla","Hindi","Symbols"]
+lan_list = ["Chinese", "Arabic", "Japanese", "Korean", "Bangla","Hindi","Latin","Symbols"]
+lan_list = ["Korean","Bangla","Hindi","Latin","Symbols"]
 chi_list = ["ArT","RCTW","ReCTS","LSVT"]
 
 def is_test(cnt,rad_list):
     return rad_list[cnt%10]==1
 
+def from_gt_file(gt_path,img_path):
+    lines = open(gt_path, 'r').readlines()
+    image_list = []
+    label_list = []
+    for line in lines:
+        line = line.strip()
+        # print(line)
+        str = line.split(" ",1)
+        if len(str)==1:
+            continue
+        else:
+            image, label=str[0],str[1]
+        image_list.append(img_path+image)
+        label_list.append(label)
+
+    return image_list, label_list
 
 def checkImageIsValid(imageBin):
     if imageBin is None:
@@ -331,6 +348,81 @@ def createDataset(inputPath, gtFile, outputPath, checkValid=True,lan_lmdb=None):
     print(lexicon)
     print("Created dataset with %d samples" % nSamples)
 
+def createSynthMLTDataset(inputPath, gtFile, outputPath, checkValid=True):
+    """a modified version of CRNN torch repository https://github.com/bgshih/crnn/blob/master/tool/create_dataset.py
+    Create LMDB dataset for training and evaluation.
+    ARGS:
+        inputPath  : input folder path where starts imagePath
+        outputPath : LMDB output path
+        gtFile     : list of image path and label
+        checkValid : if true, check the validity of every image
+    """
+    # CAUTION: if outputPath (lmdb) already exists, this function add dataset
+    # into it. so remove former one and re-create lmdb.
+    if os.path.exists(outputPath):
+        os.system(f"rm -r {outputPath}")
+
+    os.makedirs(outputPath, exist_ok=True)
+    env = lmdb.open(outputPath, map_size=80 * 2 ** 30)
+    cache = {}
+    cnt = 1
+    lexicon=set()
+
+    gt_list = gtFile
+
+    nSamples = len(gt_list)
+    for i in tqdm(range(nSamples), total=nSamples, position=0, leave=True):
+        # imagePath, label = datalist[i].strip("\n").split("\t")
+        # imagePath, label = datalist[i].strip("\n").split(" ", 1)
+        label = gt_list[i]
+        imagePath = inputPath[i]
+
+        # imagePath = os.path.join(inputPath, imagePath)
+
+        # # only use alphanumeric data
+        # if re.search('[^a-zA-Z0-9]', label):
+        #     continue
+
+        if not os.path.exists(imagePath):
+            print("%s does not exist" % imagePath)
+            continue
+        with open(imagePath, "rb") as f:
+            imageBin = f.read()
+        if checkValid:
+            try:
+                if not checkImageIsValid(imageBin):
+                    print("%s is not a valid image" % imagePath)
+                    continue
+            except:
+                print("error occured", i)
+                with open(outputPath + "/error_image_log.txt", "a") as log:
+                    log.write("%s-th image data occured error\n" % str(i))
+                continue
+
+        imageKey = "image-%09d".encode() % cnt
+        imagepathKey = "imagepath-%09d".encode() % cnt
+        labelKey = "label-%09d".encode() % cnt
+        cache[imageKey] = imageBin
+        cache[labelKey] = label.encode()
+        cache[imagepathKey] = imagePath.encode()
+
+        # print(label)
+        # label = label.decode('utf-8')
+        for char in label:
+            lexicon.add(char)
+
+        if cnt % 1000 == 0:
+            writeCache(env, cache)
+            cache = {}
+            # print('Written %d / %d' % (cnt, nSamples))
+        cnt += 1
+    nSamples = cnt - 1
+    cache["num-samples".encode()] = str(nSamples).encode()
+    writeCache(env, cache)
+    write_txt(lexicon,outputPath+"/dict")
+    print(lexicon)
+    print("Created dataset with %d samples" % nSamples)
+
 
 def createDataset_with_ValidTestset(
     inputPath,
@@ -466,16 +558,28 @@ def createDataset_with_ValidTestset(
 if __name__ == "__main__":
 
     # root_path = "../dataset/MLT2019/"
-    root_path = "../dataset/chinese/"
-    # print(root_path)
-    # for lan in lan_list:
-    #     create_train_test_Dataset(inputPath=root_path+"train", gtFile=root_path+"train/gt.txt",
-    #                               outputPath=root_path+"train_2019/mlt_2019_train_{}".format(lan),
-    #                               outputPath2=root_path + "test_2019/mlt_2019_test_{}".format(lan),
-    #                               checkValid=True,lan_lmdb=lan)
-        # createDataset(inputPath=root_path+"train", gtFile=root_path+"train/gt.txt", outputPath=root_path+"mlt_2019_train_{}".format(lan), checkValid=True,lan_lmdb=lan)
-    # fire.Fire(createDataset)
-    chi_list=["CTW"]
-    for path in chi_list:
-        total_path = root_path + path
-        create_from_lmdb_train_test_Dataset(inputPath=total_path+"_train",gtFile=None,outputPath=total_path+"/train",outputPath2=total_path+"/test", checkValid=True,lan_lmdb=None)
+    # root_path = "../dataset/chinese/"
+    # # print(root_path)
+    # # for lan in lan_list:
+    # #     create_train_test_Dataset(inputPath=root_path+"train", gtFile=root_path+"train/gt.txt",
+    # #                               outputPath=root_path+"train_2019/mlt_2019_train_{}".format(lan),
+    # #                               outputPath2=root_path + "test_2019/mlt_2019_test_{}".format(lan),
+    # #                               checkValid=True,lan_lmdb=lan)
+    #     # createDataset(inputPath=root_path+"train", gtFile=root_path+"train/gt.txt", outputPath=root_path+"mlt_2019_train_{}".format(lan), checkValid=True,lan_lmdb=lan)
+    # # fire.Fire(createDataset)
+    # # chi_list=["CTW"]
+    # for path in chi_list:
+    #     total_path = root_path + path
+    #     create_from_lmdb_train_test_Dataset(inputPath=total_path+"_train",gtFile=None,outputPath=total_path+"/train",outputPath2=total_path+"/test", checkValid=True,lan_lmdb=None)
+
+    # SynthMLT
+    for lan in lan_list:
+        root_path = "/home/ztl/dataset/SynthMLT/"
+        gt_path= "{}txt/{}/label.txt".format(root_path, lan)
+        img_path="{}txt/{}/".format(root_path, lan)
+        imgList, labelList = from_gt_file(gt_path,img_path)
+        print("The length of the list is ", len(imgList))
+
+        '''Input the address you want to generate the lmdb file.'''
+        createSynthMLTDataset(imgList, labelList,root_path+"lmdb/"+lan)
+    # inputPath, gtFile, outputPath,

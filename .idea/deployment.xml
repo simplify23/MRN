@@ -5,7 +5,7 @@
       <paths name="ztl@10.200.3.80:22 password">
         <serverdata>
           <mappings>
-            <mapping deploy="/home/ztl/STR-Fewer-Labels" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/STR-Fewer-Labels" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>

@@ -1,3 +1,5 @@
+import copy
+
 import torch.nn as nn
 
 from modules.transformation import TPS_SpatialTransformerNetwork
@@ -67,32 +69,37 @@ class Model(nn.Module):
             else:
                 print("No SequenceModeling module specified")
                 self.SequenceModeling_output = self.FeatureExtraction_output
+        self.fc = None
+        self.Prediction=None
 
-        if not SelfSL_layer:  # for STR.
-            """Prediction"""
-            if opt.Prediction == "CTC":
-                self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
-            elif opt.Prediction == "Attn":
-                self.Prediction = Attention(
-                    self.SequenceModeling_output, opt.hidden_size, opt.num_class
-                )
-            else:
-                raise Exception("Prediction is neither CTC or Attn")
+        # if not SelfSL_layer:  # for STR.
+        #     """Prediction"""
+        #     if opt.Prediction == "CTC":
+        #         self.fc = nn.Linear(self.SequenceModeling_output, opt.num_class)
+        #         self.Prediction = self.fc
+        #         # self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
+        #     elif opt.Prediction == "Attn":
+        #         self.fc = nn.Linear(opt.hidden_size, opt.num_class)
+        #         self.Prediction = Attention(
+        #             self.SequenceModeling_output, opt.hidden_size, opt.num_class,self.fc
+        #         )
+        #     else:
+        #         raise Exception("Prediction is neither CTC or Attn")
 
-        else:
-            """for self-supervised learning (SelfSL)"""
-            self.AdaptiveAvgPool_2 = nn.AdaptiveAvgPool2d((None, 1))  # make width -> 1
-            if SelfSL_layer == "CNN":
-                self.SelfSL_FFN_input = self.FeatureExtraction_output
-
-            if "RotNet" in self.opt.self:
-                self.SelfSL = nn.Linear(
-                    self.SelfSL_FFN_input, 4
-                )  # 4 = [0, 90, 180, 270] degrees
-            elif "MoCo" in self.opt.self:
-                self.SelfSL = nn.Linear(
-                    self.SelfSL_FFN_input, 128
-                )  # 128 is used for MoCo paper.
+        # else:
+        #     """for self-supervised learning (SelfSL)"""
+        #     self.AdaptiveAvgPool_2 = nn.AdaptiveAvgPool2d((None, 1))  # make width -> 1
+        #     if SelfSL_layer == "CNN":
+        #         self.SelfSL_FFN_input = self.FeatureExtraction_output
+        #
+        #     if "RotNet" in self.opt.self:
+        #         self.SelfSL = nn.Linear(
+        #             self.SelfSL_FFN_input, 4
+        #         )  # 4 = [0, 90, 180, 270] degrees
+        #     elif "MoCo" in self.opt.self:
+        #         self.SelfSL = nn.Linear(
+        #             self.SelfSL_FFN_input, 128
+        #         )  # 128 is used for MoCo paper.
 
     def forward(self, image, text=None, is_train=True, SelfSL_layer=False):
         """Transformation stage"""
@@ -141,3 +148,39 @@ class Model(nn.Module):
             )
 
         return prediction  # [b, num_steps, opt.num_class]
+
+    def update_fc(self, hidden_size, nb_classes,device=None):
+        fc = nn.Linear(hidden_size, nb_classes)
+        if self.fc is not None:
+            nb_output = self.fc.out_features
+            weight = copy.deepcopy(self.fc.weight.data)
+            bias = copy.deepcopy(self.fc.bias.data)
+            fc.weight.data[:nb_output] = weight
+            fc.bias.data[:nb_output] = bias
+
+        del self.fc
+        self.fc = fc
+
+    def build_prediction(self,opt,num_class):
+        """Prediction"""
+        if opt.Prediction == "CTC":
+            self.fc = nn.Linear(self.SequenceModeling_output, num_class)
+            self.Prediction = self.fc
+            # self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
+        elif opt.Prediction == "Attn":
+            self.fc = nn.Linear(opt.hidden_size, num_class)
+            self.Prediction = Attention(
+                self.SequenceModeling_output, opt.hidden_size, num_class,self.fc
+            )
+        else:
+            raise Exception("Prediction is neither CTC or Attn")
+
+    def copy(self):
+        return copy.deepcopy(self)
+
+    def freeze(self):
+        for param in self.parameters():
+            param.requires_grad = False
+        self.eval()
+
+        return self

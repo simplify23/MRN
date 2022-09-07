@@ -29,7 +29,8 @@ class CTCLabelConverter(object):
         self.character = [
             "[CTCblank]"
         ] + dict_character  # dummy '[CTCblank]' token for CTCLoss (index 0).
-        print(f"# of tokens and characters: {len(self.character)}")
+        print(f"# characters dict has: {len(self.character)}")
+        # print(f"\n {self.character}\n")
 
     def encode(self, word_string, batch_max_length=25):
         """convert word_list (string) into word_index.
@@ -188,3 +189,43 @@ def tensor2im(image_tensor, imtype=np.uint8):
 def save_image(image_numpy, image_path):
     image_pil = PIL.Image.fromarray(image_numpy)
     image_pil.save(image_path)
+
+def crop_img(src_img, box, long_edge_pad_ratio=0.4, short_edge_pad_ratio=0.2):
+    """Crop text region with their bounding box.
+
+    Args:
+        src_img (np.array): The original image.
+        box (list[float | int]): Points of quadrangle.
+        long_edge_pad_ratio (float): Box pad ratio for long edge
+            corresponding to font size.
+        short_edge_pad_ratio (float): Box pad ratio for short edge
+            corresponding to font size.
+    """
+    assert utils.is_type_list(box, (float, int))
+    assert len(box) == 8
+    assert 0. <= long_edge_pad_ratio < 1.0
+    assert 0. <= short_edge_pad_ratio < 1.0
+
+    h, w = src_img.shape[:2]
+    points_x = np.clip(np.array(box[0::2]), 0, w)
+    points_y = np.clip(np.array(box[1::2]), 0, h)
+
+    box_width = np.max(points_x) - np.min(points_x)
+    box_height = np.max(points_y) - np.min(points_y)
+    font_size = min(box_height, box_width)
+
+    if box_height < box_width:
+        horizontal_pad = long_edge_pad_ratio * font_size
+        vertical_pad = short_edge_pad_ratio * font_size
+    else:
+        horizontal_pad = short_edge_pad_ratio * font_size
+        vertical_pad = long_edge_pad_ratio * font_size
+
+    left = np.clip(int(np.min(points_x) - horizontal_pad), 0, w)
+    top = np.clip(int(np.min(points_y) - vertical_pad), 0, h)
+    right = np.clip(int(np.max(points_x) + horizontal_pad), 0, w)
+    bottom = np.clip(int(np.max(points_y) + vertical_pad), 0, h)
+
+    dst_img = src_img[top:bottom, left:right]
+
+    return dst_img
