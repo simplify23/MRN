@@ -27,6 +27,7 @@ class BaseLearner(object):
         self.scheduler = None
         self.criterion = None
         self.converter = None
+        self._old_network = None
         # opt.num_class = self._total_classes
         self.model = Model(opt)
 
@@ -131,7 +132,7 @@ class BaseLearner(object):
 
     def after_task(self):
         self.model = self.model.module
-        self.old_model = self.model.copy().freeze()
+        self._old_network = self.model.copy().freeze()
         self._known_classes = self._total_classes
 
     def incremental_train(self,taski, character, train_loader, valid_loader):
@@ -167,8 +168,14 @@ class BaseLearner(object):
 
         self._train(start_iter,taski, train_loader, valid_loader)
 
+    def _train(self, start_iter,taski, train_loader, valid_loader):
+        if taski == 0:
+            self._init_train(start_iter,taski, train_loader, valid_loader)
+        else:
+            self._update_representation(start_iter,taski, train_loader, valid_loader)
 
-    def _train(self,start_iter,taski, train_loader, valid_loader):
+
+    def _init_train(self,start_iter,taski, train_loader, valid_loader):
         # loss averager
         train_loss_avg = Averager()
         semi_loss_avg = Averager()
@@ -226,11 +233,11 @@ class BaseLearner(object):
                 train_loss_avg.reset()
                 semi_loss_avg.reset()
 
-    def _update_representation(self,):
-        pass
+    def _update_representation(self,start_iter,taski, train_loader, valid_loader):
+        self._init_train(start_iter,taski, train_loader, valid_loader)
 
-    def _init_train(self):
-        pass
+    # def _init_train(self):
+    #     pass
 
     def val(self, valid_loader, opt, best_score, start_time, iteration,
             train_loss_avg, taski):

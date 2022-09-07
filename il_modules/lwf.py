@@ -1,4 +1,6 @@
 import logging
+import time
+
 import numpy as np
 import torch
 from torch import nn
@@ -6,10 +8,9 @@ from torch.serialization import load
 from tqdm import tqdm
 from torch import optim
 from torch.nn import functional as F
-from torch.utils.data import DataLoader
-from utils.inc_net import IncrementalNet
-from models.base import BaseLearner
-from utils.toolkit import target2onehot, tensor2numpy
+
+from il_modules.base import BaseLearner
+from tools.utils import Averager, adjust_learning_rate
 
 init_epoch = 200
 init_lr = 0.1
@@ -30,173 +31,80 @@ lamda = 3
 
 
 class LwF(BaseLearner):
-    def __init__(self, args):
-        super().__init__(args)
-        self._network = IncrementalNet(args["convnet_type"], False)
+    def __init__(self, opt):
+        super().__init__(opt)
 
-    def after_task(self):
-        self._old_network = self._network.copy().freeze()
-        self._known_classes = self._total_classes
+    def _update_representation(self,start_iter, taski, train_loader, valid_loader):
+        # loss averager
+        train_loss_avg = Averager()
+        # semi_loss_avg = Averager()
 
-    def incremental_train(self, data_manager):
-        self._cur_task += 1
-        self._total_classes = self._known_classes + data_manager.get_task_size(
-            self._cur_task
-        )
-        self._network.update_fc(self._total_classes)
-        logging.info(
-            "Learning on {}-{}".format(self._known_classes, self._total_classes)
-        )
+        start_time = time.time()
+        best_score = -1
 
-        train_dataset = data_manager.get_dataset(
-            np.arange(self._known_classes, self._total_classes),
-            source="train",
-            mode="train",
-        )
-        self.train_loader = DataLoader(
-            train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
-        )
-        test_dataset = data_manager.get_dataset(
-            np.arange(0, self._total_classes), source="test", mode="test"
-        )
-        self.test_loader = DataLoader(
-            test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
-        )
+        # training loop
+        for iteration in tqdm(
+                range(start_iter + 1, self.opt.num_iter + 1),
+                total=self.opt.num_iter,
+                position=0,
+                leave=True,
+        ):
+            image_tensors, labels = train_loader.get_batch()
 
-        if len(self._multiple_gpus) > 1:
-            self._network = nn.DataParallel(self._network, self._multiple_gpus)
-        self._train(self.train_loader, self.test_loader)
-        if len(self._multiple_gpus) > 1:
-            self._network = self._network.module
-
-    def _train(self, train_loader, test_loader):
-        self._network.to(self._device)
-        if self._old_network is not None:
-            self._old_network.to(self._device)
-
-        if self._cur_task == 0:
-            optimizer = optim.SGD(
-                self._network.parameters(),
-                momentum=0.9,
-                lr=init_lr,
-                weight_decay=init_weight_decay,
+            image = image_tensors.to(self.device)
+            labels_index, labels_length = self.converter.encode(
+                labels, batch_max_length=self.opt.batch_max_length
             )
-            scheduler = optim.lr_scheduler.MultiStepLR(
-                optimizer=optimizer, milestones=init_milestones, gamma=init_lr_decay
-            )
-            self._init_train(train_loader, test_loader, optimizer, scheduler)
-        else:
-            optimizer = optim.SGD(
-                self._network.parameters(),
-                lr=lrate,
-                momentum=0.9,
-                weight_decay=weight_decay,
-            )
-            scheduler = optim.lr_scheduler.MultiStepLR(
-                optimizer=optimizer, milestones=milestones, gamma=lrate_decay
-            )
-            self._update_representation(train_loader, test_loader, optimizer, scheduler)
+            batch_size = image.size(0)
 
-    def _init_train(self, train_loader, test_loader, optimizer, scheduler):
-        prog_bar = tqdm(range(init_epoch))
-        for _, epoch in enumerate(prog_bar):
-            self._network.train()
-            losses = 0.0
-            correct, total = 0, 0
-            for i, (_, inputs, targets) in enumerate(train_loader):
-                inputs, targets = inputs.to(self._device), targets.to(self._device)
-                logits = self._network(inputs)["logits"]
-
-                loss = F.cross_entropy(logits, targets)
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                losses += loss.item()
-
-                _, preds = torch.max(logits, dim=1)
-                correct += preds.eq(targets.expand_as(preds)).cpu().sum()
-                total += len(targets)
-
-            scheduler.step()
-            train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
-
-            if epoch % 5 == 0:
-                info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
-                    self._cur_task,
-                    epoch + 1,
-                    init_epoch,
-                    losses / len(train_loader),
-                    train_acc,
-                )
+            # default recognition loss part
+            if "CTC" in self.opt.Prediction:
+                preds = self.model(image)
+                old_preds = self._old_network(image)
+                preds_size = torch.IntTensor([preds.size(1)] * batch_size)
+                # B，T，C(max) -> T, B, C
+                preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
+                loss_clf = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
             else:
-                test_acc = self._compute_accuracy(self._network, test_loader)
-                info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
-                    self._cur_task,
-                    epoch + 1,
-                    init_epoch,
-                    losses / len(train_loader),
-                    train_acc,
-                    test_acc,
-                )
-            prog_bar.set_description(info)
-
-        logging.info(info)
-
-    def _update_representation(self, train_loader, test_loader, optimizer, scheduler):
-
-        prog_bar = tqdm(range(epochs))
-        for _, epoch in enumerate(prog_bar):
-            self._network.train()
-            losses = 0.0
-            correct, total = 0, 0
-            for i, (_, inputs, targets) in enumerate(train_loader):
-                inputs, targets = inputs.to(self._device), targets.to(self._device)
-                logits = self._network(inputs)["logits"]
-
-                fake_targets = targets - self._known_classes
-                loss_clf = F.cross_entropy(
-                    logits[:, self._known_classes :], fake_targets
-                )
-                loss_kd = _KD_loss(
-                    logits[:, : self._known_classes],
-                    self._old_network(inputs)["logits"],
-                    T,
+                preds = self.model(image, labels_index[:, :-1])  # align with Attention.forward
+                old_preds = self._old_network(image, labels_index[:, :-1])
+                target = labels_index[:, 1:]  # without [SOS] Symbol
+                loss_clf = self.criterion(
+                    preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
                 )
 
-                loss = lamda * loss_kd + loss_clf
+            # fake_targets = self._total_classes - self._known_classes
+            # loss_clf = F.cross_entropy(
+            #     preds_log_softmax[:, self._known_classes:], fake_targets
+            # )
+            loss_kd = _KD_loss(
+                preds.view(-1,preds.shape[-1])[:, : self._known_classes],
+                old_preds.view(-1,old_preds.shape[-1])[:, : self._known_classes],
+                T,
+            )
 
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                losses += loss.item()
+            loss = lamda * loss_kd + loss_clf
 
-                with torch.no_grad():
-                    _, preds = torch.max(logits, dim=1)
-                    correct += preds.eq(targets.expand_as(preds)).cpu().sum()
-                    total += len(targets)
+            self.model.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(), self.opt.grad_clip
+            )  # gradient clipping with 5 (Default)
+            self.optimizer.step()
+            train_loss_avg.add(loss)
 
-            scheduler.step()
-            train_acc = np.around(tensor2numpy(correct) * 100 / total, decimals=2)
-            if epoch % 5 == 0:
-                test_acc = self._compute_accuracy(self._network, test_loader)
-                info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}, Test_accy {:.2f}".format(
-                    self._cur_task,
-                    epoch + 1,
-                    epochs,
-                    losses / len(train_loader),
-                    train_acc,
-                    test_acc,
-                )
+            if "super" in self.opt.schedule:
+                self.scheduler.step()
             else:
-                info = "Task {}, Epoch {}/{} => Loss {:.3f}, Train_accy {:.2f}".format(
-                    self._cur_task,
-                    epoch + 1,
-                    epochs,
-                    losses / len(train_loader),
-                    train_acc,
-                )
-            prog_bar.set_description(info)
-        logging.info(info)
+                adjust_learning_rate(self.optimizer, iteration, self.opt)
+
+            # validation part.
+            # To see training progress, we also conduct validation when 'iteration == 1'
+            if iteration % self.opt.val_interval == 0 or iteration == 1:
+                # for validation log
+                self.val(valid_loader, self.opt,  best_score, start_time, iteration,
+                    train_loss_avg, taski)
+                train_loss_avg.reset()
 
 
 def _KD_loss(pred, soft, T):

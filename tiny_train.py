@@ -6,6 +6,7 @@ import argparse
 
 import il_modules
 from il_modules.base import BaseLearner
+from il_modules.lwf import LwF
 
 print(os.getcwd()) #打印出当前工作路径
 import torch
@@ -236,11 +237,13 @@ def train(opt, log):
     # train_datasets = [opt.root_pefix + "_train_" + lan for lan in opt.lan_list]
     # valid_datasets = [opt.root_pefix + "_test_" + lan for lan in opt.lan_list]
     write_data_log(f"---- {opt.exp_name} ----\n")
-    train_datasets = [lan for lan in opt.lan_list]
-    valid_datasets = [lan for lan in opt.lan_list]
+
     if opt.ch_list!=None:
         train_datasets = [ch+"/train" for ch in opt.ch_list]
         valid_datasets = [ch+"/test" for ch in opt.ch_list]
+    else:
+        train_datasets = [lan for lan in opt.lan_list]
+        valid_datasets = [lan for lan in opt.lan_list]
 
     best_scores = []
     valid_datas = []
@@ -255,11 +258,14 @@ def train(opt, log):
     opt_log += "---------------------------------------\n"
     # print(opt_log)
     log.write(opt_log)
-    learner = BaseLearner(opt)
+    if opt.il =="lwf":
+        learner = LwF(opt)
+    else:
+        learner = BaseLearner(opt)
     
     for taski in range(len(train_datasets)):
         train_data = os.path.join(opt.train_data, train_datasets[taski])
-        valid_data = os.path.join(opt.valid_data, valid_datasets[0])
+        valid_data = os.path.join(opt.valid_data, valid_datasets[taski])
         valid_datas.append(valid_data)
 
 
