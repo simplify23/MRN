@@ -6,7 +6,9 @@ import argparse
 
 import il_modules
 from il_modules.base import BaseLearner
+from il_modules.ewc import EWC
 from il_modules.lwf import LwF
+from il_modules.wa import WA
 
 print(os.getcwd()) #打印出当前工作路径
 import torch
@@ -246,6 +248,7 @@ def train(opt, log):
         valid_datasets = [lan for lan in opt.lan_list]
 
     best_scores = []
+    ned_scores = []
     valid_datas = []
     char = dict()
     """ final options """
@@ -260,6 +263,10 @@ def train(opt, log):
     log.write(opt_log)
     if opt.il =="lwf":
         learner = LwF(opt)
+    elif opt.il == "wa":
+        learner = WA(opt)
+    elif opt.il =="ewc":
+        learner = EWC(opt)
     else:
         learner = BaseLearner(opt)
     
@@ -313,7 +320,7 @@ def train(opt, log):
 
         # ----- incremental model end -------
         """ Evaluation at the end of training """
-        best_scores = learner.test(AlignCollate_valid,valid_datas,best_scores,taski)
+        best_scores,ned_scores = learner.test(AlignCollate_valid,valid_datas,best_scores,ned_scores, taski)
         learner.after_task()
 
     print(
@@ -482,23 +489,23 @@ if __name__ == "__main__":
 
     opt = argparse.Namespace(**opt)
 
-    if opt.model_name == "CRNN":  # CRNN = NVBC
-        opt.Transformation = "None"
-        opt.FeatureExtraction = "VGG"
-        opt.SequenceModeling = "BiLSTM"
-        opt.Prediction = "CTC"
-
-    elif opt.model_name == "TRBA":  # TRBA
-        opt.Transformation = "TPS"
-        opt.FeatureExtraction = "ResNet"
-        opt.SequenceModeling = "BiLSTM"
-        opt.Prediction = "Attn"
-
-    elif opt.model_name == "RBA":  # RBA
-        opt.Transformation = "None"
-        opt.FeatureExtraction = "ResNet"
-        opt.SequenceModeling = "BiLSTM"
-        opt.Prediction = "Attn"
+    # if opt.model_name == "CRNN":  # CRNN = NVBC
+    #     opt.Transformation = "None"
+    #     opt.FeatureExtraction = "VGG"
+    #     opt.SequenceModeling = "BiLSTM"
+    #     opt.Prediction = "CTC"
+    #
+    # elif opt.model_name == "TRBA":  # TRBA
+    #     opt.Transformation = "TPS"
+    #     opt.FeatureExtraction = "ResNet"
+    #     opt.SequenceModeling = "BiLSTM"
+    #     opt.Prediction = "Attn"
+    #
+    # elif opt.model_name == "RBA":  # RBA
+    #     opt.Transformation = "None"
+    #     opt.FeatureExtraction = "ResNet"
+    #     opt.SequenceModeling = "BiLSTM"
+    #     opt.Prediction = "Attn"
 
     """ Seed and GPU setting """
     random.seed(opt.manual_seed)

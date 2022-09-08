@@ -1,5 +1,6 @@
 import copy
 
+import torch
 import torch.nn as nn
 
 from modules.transformation import TPS_SpatialTransformerNetwork
@@ -176,6 +177,16 @@ class Model(nn.Module):
 
         del self.fc
         self.fc = fc
+
+    def weight_align(self, increment):
+        weights=self.fc.weight.data
+        newnorm=(torch.norm(weights[-increment:,:],p=2,dim=1))
+        oldnorm=(torch.norm(weights[:-increment,:],p=2,dim=1))
+        meannew=torch.mean(newnorm)
+        meanold=torch.mean(oldnorm)
+        gamma=meanold/meannew
+        print('alignweights,gamma=',gamma)
+        self.fc.weight.data[-increment:,:]*=gamma
 
     def build_prediction(self,opt,num_class):
         """Prediction"""
