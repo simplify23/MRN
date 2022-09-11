@@ -18,7 +18,7 @@ class Dataset_Manager(object):
         self.select_data = None
 
     def init_start(
-        self, opt, dataset_root, select_data, log, taski,memory=None):
+        self, opt, dataset_root, select_data, log, taski,memory="random_memory"):
         self.opt = opt
         self.select_data = select_data
         self.data_loader_list = []
@@ -34,19 +34,10 @@ class Dataset_Manager(object):
         )
 
         dataset = self.create_dataset(data_list=select_data,taski=taski)
-        if memory != None:
-            pass
-        data_loader = torch.utils.data.DataLoader(
-            dataset,
-            batch_size=self.opt.batch_size,
-            shuffle=True,
-            num_workers=int(self.opt.workers),
-            collate_fn=AlignCollate(self.opt),
-            pin_memory=False,
-            drop_last=False,
-        )
-        self.data_loader_list.append(data_loader)
-        self.dataloader_iter_list.append(iter(data_loader))
+        if memory == "random_memory":
+            memory_data = self.memory_dataset(select_data, taski, random=True,total_num=2000)
+            self.create_dataloader(memory_data)
+        self.create_dataloader(dataset)
         # self.data_list.append(dataset)
         # self.create_data_loader(dataset)
 
@@ -84,6 +75,19 @@ class Dataset_Manager(object):
         #     dataset_list.append(memory_dataset)
 
         return ConcatDataset(dataset_list)
+
+    def create_dataloader(self,dataset,batch_size=None):
+        data_loader = torch.utils.data.DataLoader(
+            dataset,
+            batch_size=self.opt.batch_size if batch_size==None else batch_size,
+            shuffle=True,
+            num_workers=int(self.opt.workers),
+            collate_fn=AlignCollate(self.opt),
+            pin_memory=False,
+            drop_last=False,
+        )
+        self.data_loader_list.append(data_loader)
+        self.dataloader_iter_list.append(iter(data_loader))
 
     def get_batch(self):
         balanced_batch_images = []
