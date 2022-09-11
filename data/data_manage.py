@@ -1,6 +1,7 @@
 import os
 
 import numpy as np
+import numpy.random
 import torch
 from torch.utils.data import Dataset, ConcatDataset, Subset
 from torch._utils import _accumulate
@@ -49,13 +50,20 @@ class Dataset_Manager(object):
         # self.data_list.append(dataset)
         # self.create_data_loader(dataset)
 
-    def memory_dataset(self,select_data, taski):
-        dataset = self.create_dataset(data_list=select_data,taski=taski)
-        split_dataset = Subset(dataset, range(len(dataset)))
-        return split_dataset
+    def memory_dataset(self,select_data, taski, random=True,total_num=2000,index_list=None):
+        data_list = []
+        num_i = int(total_num/taski)
+        for i in range(taski-1):
+            dataset = self.create_dataset(data_list=select_data,taski=i,repeat=False)
+            if random:
+                index_list = numpy.random.choice(range(len(dataset)),num_i,replace=False)
+            # print(random)
+            split_dataset = Subset(dataset,list(index_list))
+            data_list.append(split_dataset)
+        return ConcatDataset(data_list)
 
 
-    def create_dataset(self, data_list="/", taski=0, mode="train"):
+    def create_dataset(self, data_list="/", taski=0, mode="train", repeat=True):
         """select_data is list for all dataset"""
         dataset_list = []
         for data_root in data_list:
@@ -67,7 +75,7 @@ class Dataset_Manager(object):
             print(dataset_log)
 
             # for faster training, we multiply small datasets itself.
-            if len(dataset) < 50000:
+            if len(dataset) < 50000 and repeat:
                 multiple_times = int(50000 / len(dataset))
                 dataset_self_multiple = [dataset] * multiple_times
                 dataset = ConcatDataset(dataset_self_multiple)
@@ -75,8 +83,7 @@ class Dataset_Manager(object):
         # if memory !=None:
         #     dataset_list.append(memory_dataset)
 
-        total_data = ConcatDataset(dataset_list)
-        return total_data
+        return ConcatDataset(dataset_list)
 
     def get_batch(self):
         balanced_batch_images = []
