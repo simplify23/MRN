@@ -234,6 +234,7 @@ class BaseLearner(object):
                 semi_loss_avg.reset()
 
     def _update_representation(self,start_iter,taski, train_loader, valid_loader):
+        train_loader.get_dataset(taski,memory=self.opt.memory)
         self._init_train(start_iter,taski, train_loader, valid_loader)
 
     # def _init_train(self):

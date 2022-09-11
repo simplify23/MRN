@@ -17,6 +17,19 @@ class Dataset_Manager(object):
         self.dataloader_iter_list = []
         self.select_data = None
 
+    def get_dataset(self, taski, memory="random_memory"):
+        self.data_loader_list = []
+        self.dataloader_iter_list = []
+
+        dataset = self.create_dataset(data_list=self.select_data,taski=taski)
+
+        if memory == "random_memory":
+            memory_data = self.memory_dataset(self.select_data, taski, random=True,total_num=2000)
+            self.create_dataloader(memory_data,(self.opt.batch_size)//2)
+            self.create_dataloader(dataset,(self.opt.batch_size)//2)
+        else:
+            self.create_dataloader(dataset)
+
     def init_start(
         self, opt, dataset_root, select_data, log, taski,memory="random_memory"):
         self.opt = opt
@@ -32,12 +45,13 @@ class Dataset_Manager(object):
         log.write(
             f"dataset_root: {dataset_root}\n select_data: {select_data}\n"
         )
+        self.get_dataset(taski, memory=memory)
+        # dataset = self.create_dataset(data_list=select_data,taski=taski)
+        # self.create_dataloader(dataset)
+        # if memory == "random_memory":
+        #     memory_data = self.memory_dataset(select_data, taski, random=True,total_num=2000)
+        #     self.create_dataloader(memory_data)
 
-        dataset = self.create_dataset(data_list=select_data,taski=taski)
-        if memory == "random_memory":
-            memory_data = self.memory_dataset(select_data, taski, random=True,total_num=2000)
-            self.create_dataloader(memory_data)
-        self.create_dataloader(dataset)
         # self.data_list.append(dataset)
         # self.create_data_loader(dataset)
 

@@ -293,7 +293,7 @@ def train(opt, log):
         #     opt, train_data, select_data, batch_ratio, log,taski
         # )
 
-        data_manager.init_start(opt, train_data, select_data, log, taski)
+        data_manager.init_start(opt, train_data, select_data, log, taski, memory=None)
         train_loader = data_manager
 
         #-------load char to dict --------#
