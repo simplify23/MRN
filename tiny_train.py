@@ -5,6 +5,7 @@ import random
 import argparse
 
 import il_modules
+from data.data_manage import Dataset_Manager
 from il_modules.base import BaseLearner
 from il_modules.ewc import EWC
 from il_modules.lwf import LwF
@@ -269,6 +270,8 @@ def train(opt, log):
         learner = EWC(opt)
     else:
         learner = BaseLearner(opt)
+
+    data_manager = Dataset_Manager()
     
     for taski in range(len(train_datasets)):
         train_data = os.path.join(opt.train_data, train_datasets[taski])
@@ -279,16 +282,19 @@ def train(opt, log):
         """dataset preparation"""
         select_data = opt.select_data
 
-        # set batch_ratio for each data.
-        if opt.batch_ratio:
-            batch_ratio = opt.batch_ratio.split("-")
-            # batch_ratio = opt.batch_ratio
-        else:
-            batch_ratio = [round(1 / len(select_data), 3)] * len(select_data)
+        # # set batch_ratio for each data.
+        # if opt.batch_ratio:
+        #     batch_ratio = opt.batch_ratio.split("-")
+        #     # batch_ratio = opt.batch_ratio
+        # else:
+        #     batch_ratio = [round(1 / len(select_data), 3)] * len(select_data)
+        #
+        # train_loader = Batch_Balanced_Dataset(
+        #     opt, train_data, select_data, batch_ratio, log,taski
+        # )
 
-        train_loader = Batch_Balanced_Dataset(
-            opt, train_data, select_data, batch_ratio, log,taski
-        )
+        data_manager.init_start(opt, train_data, select_data, log, taski)
+        train_loader = data_manager
 
         #-------load char to dict --------#
         for data_path in opt.select_data:
