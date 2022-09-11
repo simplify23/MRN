@@ -34,6 +34,11 @@ class LwF(BaseLearner):
     def __init__(self, opt):
         super().__init__(opt)
 
+    def after_task(self):
+        self.model = self.model.module
+        self._old_network = self.model.copy().freeze()
+        self._known_classes = self._total_classes
+
     def _update_representation(self,start_iter, taski, train_loader, valid_loader):
         # loss averager
         train_loss_avg = Averager()

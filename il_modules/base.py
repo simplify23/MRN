@@ -132,7 +132,7 @@ class BaseLearner(object):
 
     def after_task(self):
         self.model = self.model.module
-        self._old_network = self.model.copy().freeze()
+        # self._old_network = self.model.copy().freeze()
         self._known_classes = self._total_classes
 
     def incremental_train(self,taski, character, train_loader, valid_loader):
@@ -294,11 +294,11 @@ class BaseLearner(object):
         valid_log = f"{valid_log}\n{predicted_result_log}"
         print(valid_log)
         self.write_log(valid_log + "\n")
-        self.write_data_log(
-            f"Task {opt.lan_list[taski]} [{iteration}/{opt.num_iter}] : Score:{current_score:0.2f} LR:{lr:0.7f}\n")
+        # self.write_data_log(
+        #     f"Task {opt.lan_list[taski]} [{iteration}/{opt.num_iter}] : Score:{current_score:0.2f} LR:{lr:0.7f}\n")
 
 
-    def test(self, AlignCollate_valid,valid_datas,best_scores,taski):
+    def test(self, AlignCollate_valid,valid_datas,best_scores,ned_scores,taski):
         print("---Start evaluation on benchmark testset----")
         """ keep evaluation model and result logs """
         os.makedirs(f"./result/{self.opt.exp_name}", exist_ok=True)
@@ -312,6 +312,7 @@ class BaseLearner(object):
         self.model.load_state_dict(torch.load(f"{saved_best_model}"))
 
         task_accs = []
+        ned_accs = []
         for val_data in valid_datas:
             valid_dataset, valid_dataset_log = hierarchical_dataset(
                 root=val_data, opt=self.opt, mode="test")
@@ -337,15 +338,17 @@ class BaseLearner(object):
                     length_of_data,
                 ) = validation(self.model, self.criterion, valid_loader, self.converter, self.opt)
 
-            task_accs.append(current_score)
+            task_accs.append(round(current_score,2))
+            ned_accs.append(round(ned_score,2))
 
-        best_scores.append(sum(task_accs) / len(task_accs))
+        best_scores.append(round(sum(task_accs) / len(task_accs),2))
+        ned_scores.append(round(sum(ned_accs) / len(ned_accs),2))
 
-        acc_log= f'Task {taski} Test Average Incremental Accuracy: {best_scores[taski]} \n Task {taski} Incremental Accuracy: {task_accs}'
-        self.write_data_log(f'Task {taski} Avg Acc: {best_scores[taski]:0.2f} \n  {task_accs}\n')
+        acc_log= f'Task {taski} Test Average Incremental Accuracy: {best_scores[taski]} \n Task {taski} Incremental Accuracy: {task_accs}\n ned_acc: {ned_accs}\n'
+        self.write_data_log(f'{taski} Avg Acc: {best_scores[taski]:0.2f} \n  acc: {task_accs}\n ned_acc: {ned_accs}\n')
         print(acc_log)
         self.write_log(acc_log)
-        return best_scores
+        return best_scores,ned_scores
 
     def count_param(self):
         filtered_parameters = []
