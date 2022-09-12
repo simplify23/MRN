@@ -27,7 +27,7 @@ class BaseLearner(object):
         self.scheduler = None
         self.criterion = None
         self.converter = None
-        self.memory_index = []
+        self.memory_index = None
         self._old_network = None
         # opt.num_class = self._total_classes
         self.model = Model(opt)
@@ -109,13 +109,13 @@ class BaseLearner(object):
         self._total_classes = len(converter.character)
         return converter
 
-    def build_criterion(self,reduction="mean"):
+    def build_criterion(self):
         """ setup loss """
         if "CTC" in self.opt.Prediction:
-            criterion = torch.nn.CTCLoss(reduction=reduction,zero_infinity=True).to(self.device)
+            criterion = torch.nn.CTCLoss(zero_infinity=True).to(self.device)
         else:
             # ignore [PAD] token
-            criterion = torch.nn.CrossEntropyLoss(reduction=reduction,ignore_index=self.converter.dict["[PAD]"]).to(
+            criterion = torch.nn.CrossEntropyLoss(ignore_index=self.converter.dict["[PAD]"]).to(
                 self.device
             )
         return criterion
@@ -133,7 +133,7 @@ class BaseLearner(object):
 
     def after_task(self):
         self.model = self.model.module
-        self._old_network = self.model.copy().freeze()
+        # self._old_network = self.model.copy().freeze()
         self._known_classes = self._total_classes
 
     def incremental_train(self,taski, character, train_loader, valid_loader):
@@ -173,10 +173,6 @@ class BaseLearner(object):
         if taski == 0:
             self._init_train(start_iter,taski, train_loader, valid_loader)
         else:
-            if self.opt.memory == "rehearsal":
-                self.build_rehearsal_memory(train_loader, taski)
-            else:
-                train_loader.get_dataset(taski, memory=self.opt.memory)
             self._update_representation(start_iter,taski, train_loader, valid_loader)
 
 
@@ -239,57 +235,20 @@ class BaseLearner(object):
                 semi_loss_avg.reset()
 
     def _update_representation(self,start_iter,taski, train_loader, valid_loader):
+        train_loader.get_dataset(taski,memory=self.opt.memory)
         self._init_train(start_iter,taski, train_loader, valid_loader)
 
     def build_rehearsal_memory(self,train_loader,taski):
         # Calculate the means of old classes with newly trained network
         memory_num = self.opt.memory_num
-        num_i = int(memory_num / (taski))
+        if self.memory_index !=None  and self.memory_index.size > memory_num:
+            self.reduce_samplers(taski,total_num = memory_num)
+        self.memory_index = train_loader.rehearsal_memory(taski, random=False,total_num=memory_num,index_array=self.memory_index)
 
-        self.build_current_memory(num_i,taski,train_loader)
-        if len(self.memory_index) != 0 and len(self.memory_index)*len(self.memory_index[0]) > memory_num:
-            self.reduce_samplers(taski,taski_num =num_i)
-        train_loader.get_dataset(taski,memory=memory_num)
-        print("Is using rehearsal memory, has {} prev datasets, each has {}\n".format(len(self.memory_index),self.memory_index[0].size))
-
-    def build_current_memory(self, taski_num, taski, train_loader):
-        prev_loader = train_loader.rehearsal_prev_model(taski)
-        criterion = self.build_criterion("none")
-        loss = []
-        for i, (image_tensors, labels) in enumerate(prev_loader):
-            image = image_tensors.to(self.device)
-            labels_index, labels_length = self.converter.encode(
-                labels, batch_max_length=self.opt.batch_max_length
-            )
-            batch_size = image.size(0)
-            # default recognition loss part
-            if "CTC" in self.opt.Prediction:
-                preds = self._old_network(image)
-                preds_size = torch.IntTensor([preds.size(1)] * batch_size)
-                # B，T，C(max) -> T, B, C
-                preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
-                loss_clf = criterion(preds_log_softmax, labels_index, preds_size, labels_length)
-            else:
-                preds = self.model(image, labels_index[:, :-1])  # align with Attention.forward
-                target = labels_index[:, 1:]  # without [SOS] Symbol
-                loss_clf = criterion(
-                    preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
-                )
-            loss.append(loss_clf.cpu())
-        loss = torch.cat(loss)
-        min_v, min_i = torch.topk(loss, k=int(taski_num/2), sorted=True, largest=False)
-        max_v, max_i = torch.topk(loss, k=int(taski_num/2), sorted=True, largest=True)
-        # index = torch.cat([max_i,min_i]).numpy(),0)
-        self.memory_index.append(torch.cat([max_i,min_i]).numpy())
-
-    def reduce_samplers(self,taski,taski_num):
-        div = taski_num//2
-        for i in range(taski):
-            list_num = len(self.memory_index[i])
-            maxi = self.memory_index[i][:div]
-            mini = self.memory_index[i][list_num//2:list_num//2 + div]
-            self.memory_index[i] = np.concatenate([maxi,mini],-1)
-            print("----using memory {}".format(self.memory_index[i].size))
+    def reduce_samplers(self,taski,total_num):
+        num_i = int(total_num / (taski - 1))
+        for i in range(taski-1):
+            self.memory_index[i] = self.memory_index[i][:num_i]
 
     def val(self, valid_loader, opt, best_score, start_time, iteration,
             train_loss_avg, taski):
@@ -346,8 +305,8 @@ class BaseLearner(object):
         valid_log = f"{valid_log}\n{predicted_result_log}"
         print(valid_log)
         self.write_log(valid_log + "\n")
-        self.write_data_log(
-            f"Task {opt.lan_list[taski]} [{iteration}/{opt.num_iter}] : Score:{current_score:0.2f} LR:{lr:0.7f}\n")
+        # self.write_data_log(
+        #     f"Task {opt.lan_list[taski]} [{iteration}/{opt.num_iter}] : Score:{current_score:0.2f} LR:{lr:0.7f}\n")
 
 
     def test(self, AlignCollate_valid,valid_datas,best_scores,ned_scores,taski):
@@ -390,14 +349,17 @@ class BaseLearner(object):
                     length_of_data,
                 ) = validation(self.model, self.criterion, valid_loader, self.converter, self.opt)
 
-            task_accs.append(current_score)
-            ned_accs.append(ned_score)
+
+            task_accs.append(round(current_score,2))
+            ned_accs.append(round(ned_score,2))
+
 
         best_scores.append(round(sum(task_accs) / len(task_accs),2))
         ned_scores.append(round(sum(ned_accs) / len(ned_accs),2))
 
         acc_log= f'Task {taski} Test Average Incremental Accuracy: {best_scores[taski]} \n Task {taski} Incremental Accuracy: {task_accs}\n ned_acc: {ned_accs}\n'
-        self.write_data_log(f'Task {taski} Avg Acc: {best_scores[taski]:0.2f} \n  acc: {task_accs}\n ned_acc: {ned_accs}\n')
+        self.write_data_log(f'{taski} Avg Acc: {best_scores[taski]:0.2f} \n  acc: {task_accs}\n ned_acc: {ned_accs}\n')
+
         print(acc_log)
         self.write_log(acc_log)
         return best_scores,ned_scores

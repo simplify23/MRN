@@ -41,7 +41,7 @@ class LwF(BaseLearner):
 
     def _update_representation(self,start_iter, taski, train_loader, valid_loader):
         # loss averager
-        # train_loader.get_dataset(taski, memory=self.opt.memory)
+        train_loader.get_dataset(taski, memory=self.opt.memory)
         train_loss_avg = Averager()
         # semi_loss_avg = Averager()
 
