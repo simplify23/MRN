@@ -58,7 +58,7 @@ class Dataset_Manager(object):
     def memory_dataset(self,select_data, taski, random=True,total_num=2000,index_list=None):
         data_list = []
         num_i = int(total_num/taski)
-        for i in range(taski-1):
+        for i in range(taski):
             dataset = self.create_dataset(data_list=select_data,taski=i,repeat=False)
             if random:
                 index_list = numpy.random.choice(range(len(dataset)),num_i,replace=False)

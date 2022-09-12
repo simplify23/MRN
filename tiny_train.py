@@ -292,8 +292,8 @@ def train(opt, log):
         # train_loader = Batch_Balanced_Dataset(
         #     opt, train_data, select_data, batch_ratio, log,taski
         # )
-
-        data_manager.init_start(opt, train_data, select_data, log, taski, memory=None)
+        if taski == 0:
+            data_manager.init_start(opt, train_data, select_data, log, taski, memory=None)
         train_loader = data_manager
 
         #-------load char to dict --------#
