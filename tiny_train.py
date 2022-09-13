@@ -53,6 +53,8 @@ def load_dict(path,char):
     for ch in ch_list:
         if char.get(ch, None) == None:
             char[ch] = 1
+        else:
+            char[ch] +=1
     for key, value in char.items():
         character.append(key)
     print("dict has {} number characters\n".format(len(character)))
