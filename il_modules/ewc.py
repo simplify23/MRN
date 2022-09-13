@@ -47,7 +47,12 @@ class EWC(BaseLearner):
         if taski == 0:
             self._init_train(start_iter,taski, train_loader, valid_loader)
         else:
+            if self.opt.memory == "rehearsal":
+                self.build_rehearsal_memory(train_loader, taski)
+            else:
+                train_loader.get_dataset(taski, memory=self.opt.memory)
             self._update_representation(start_iter,taski, train_loader, valid_loader)
+            # self._update_representation(start_iter,taski, train_loader, valid_loader)
         if self.fisher is None:
             self.fisher=self.getFisherDiagonal(train_loader)
         else:
