@@ -39,7 +39,7 @@ def write_data_log(line,name=None):
     with open(f"data_any.txt", "a+") as log:
         log.write(line)
 
-def load_dict(path,char):
+def load_dict(path,char,tmp_char):
     ch_list = []
     character = []
     f = open(path + "/dict.txt")
@@ -53,12 +53,26 @@ def load_dict(path,char):
     for ch in ch_list:
         if char.get(ch, None) == None:
             char[ch] = 1
+        if tmp_char.get(ch, None) == None:
+            tmp_char[ch] = 1
         else:
-            char[ch] +=1
+            tmp_char[ch] +=1
     for key, value in char.items():
         character.append(key)
     print("dict has {} number characters\n".format(len(character)))
-    return character
+    return character,tmp_char
+
+def count_char_score(tmp_char):
+    beta = 0.9999
+    gamma = 2.0
+    weights = []
+    for key, value in tmp_char.items():
+        if value > 2:
+            print("values:{} {}".format(key,value))
+        effective_num = 1.0 - np.power(beta, value)
+        weights.append((1.0 - beta) / np.array(effective_num))
+    weights = weights / np.sum(weights) * len(tmp_char)
+    return weights
 
 def build_arg(parser):
     parser.add_argument(
@@ -280,7 +294,7 @@ def train(opt, log):
         valid_data = os.path.join(opt.valid_data, valid_datasets[taski])
         valid_datas.append(valid_data)
 
-
+        tmp_char = dict()
         """dataset preparation"""
         select_data = opt.select_data
 
@@ -303,8 +317,8 @@ def train(opt, log):
             if data_path=="/":
                 opt.character = load_dict(train_data,char)
             else:
-                opt.character = load_dict(data_path+f"/{opt.lan_list[taski]}",char)
-
+                opt.character,tmp_char = load_dict(data_path+f"/{opt.lan_list[taski]}",char,tmp_char)
+        char_score = count_char_score(tmp_char)
         AlignCollate_valid = AlignCollate(opt, mode="test")
         valid_dataset, valid_dataset_log = hierarchical_dataset(
             root=valid_data, opt=opt, mode="test"

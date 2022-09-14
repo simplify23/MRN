@@ -1,7 +1,7 @@
 common=dict(
-    exp_name="CRNN_base_memory",  # Where to store logs and models
+    exp_name="CRNN_base_random",  # Where to store logs and models
     il="base",  # base | lwf | wa | ewc
-    memory="random_memory",
+    memory="random", #rehearsal random
     memory_num=2000,
     batch_max_length = 25,
     imgH = 32,

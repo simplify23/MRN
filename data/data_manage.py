@@ -23,20 +23,20 @@ class Dataset_Manager(object):
 
         dataset = self.create_dataset(data_list=self.select_data,taski=taski)
 
-        if memory == "random_memory":
-            memory_data = self.memory_dataset(self.select_data, taski, random=True,total_num=2000,index_list=index_list)
+        if memory == "random" or memory == "rehearsal":
+            memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=2000,index_array=index_list)
             self.create_dataloader(memory_data,(self.opt.batch_size)//2)
             self.create_dataloader(dataset,(self.opt.batch_size)//2)
-        elif memory == "rehearsal_memory":
-            memory_data, index_list = self.rehearsal_memory(self.select_data, taski, random=True,total_num=2000,index_list=index_list)
-            self.create_dataloader(memory_data,(self.opt.batch_size)//2)
-            self.create_dataloader(dataset,(self.opt.batch_size)//2)
+        # elif memory == "rehearsal":
+        #     memory_data, index_list = self.rehearsal_memory(taski, random=False,total_num=2000,index_array=index_list)
+        #     self.create_dataloader(memory_data,(self.opt.batch_size)//2)
+        #     self.create_dataloader(dataset,(self.opt.batch_size)//2)
         else:
             self.create_dataloader(dataset)
         return index_list
 
     def init_start(
-        self, opt, dataset_root, select_data, log, taski,memory="random_memory"):
+        self, opt, dataset_root, select_data, log, taski,memory="random"):
         self.opt = opt
         self.select_data = select_data
         self.data_loader_list = []
@@ -50,7 +50,7 @@ class Dataset_Manager(object):
         log.write(
             f"dataset_root: {dataset_root}\n select_data: {select_data}\n"
         )
-        self.get_dataset(taski, memory=memory)
+        self.get_dataset(taski, memory=None)
         # dataset = self.create_dataset(data_list=select_data,taski=taski)
         # self.create_dataloader(dataset)
         # if memory == "random_memory":
@@ -63,7 +63,7 @@ class Dataset_Manager(object):
     def memory_dataset(self,select_data, taski, random=True,total_num=2000,index_list=None):
         data_list = []
         num_i = int(total_num/taski)
-        for i in range(taski-1):
+        for i in range(taski):
             dataset = self.create_dataset(data_list=select_data,taski=i,repeat=False)
             if random:
                 index_list = numpy.random.choice(range(len(dataset)),num_i,replace=False)
@@ -75,9 +75,9 @@ class Dataset_Manager(object):
     def rehearsal_memory(self,taski, random=False,total_num=2000,index_array=None):
         data_list = []
         select_data = self.select_data
-        num_i = int(total_num/(taski-1))
+        num_i = int(total_num/(taski))
         print("memory size is {}\n".format(num_i))
-        for i in range(taski-1):
+        for i in range(taski):
             dataset = self.create_dataset(data_list=select_data,taski=i,repeat=False)
             if random:
                 index_list = numpy.random.choice(range(len(dataset)),num_i,replace=False)
@@ -87,6 +87,20 @@ class Dataset_Manager(object):
             split_dataset = Subset(dataset,index_list.tolist())
             data_list.append(split_dataset)
         return ConcatDataset(data_list), index_array
+
+    def rehearsal_prev_model(self,taski,):
+        select_data = self.select_data
+        dataset = self.create_dataset(data_list=select_data,taski=taski-1,repeat=False)
+        data_loader = torch.utils.data.DataLoader(
+            dataset,
+            batch_size=self.opt.batch_size,
+            shuffle=False,
+            num_workers=int(self.opt.workers),
+            collate_fn=AlignCollate(self.opt),
+            pin_memory=False,
+            drop_last=False,
+        )
+        return data_loader,len(dataset)
 
 
     def create_dataset(self, data_list="/", taski=0, mode="train", repeat=True):
