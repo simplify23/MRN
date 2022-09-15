@@ -318,9 +318,20 @@ class DERNet(Model):
                 is_train,
                 batch_max_length=self.opt.batch_max_length,
             )
+
+        """ Prediction stage """
+        if self.stages["Pred"] == "CTC":
+            aux_logits = self.aux_Prediction(contextual_feature[:,-self.out_dim:].contiguous())
+        else:
+            aux_logits = self.aux_Prediction(
+                contextual_feature[:,-self.out_dim:].contiguous(),
+                text,
+                is_train,
+                batch_max_length=self.opt.batch_max_length,
+            )
         # out=self.fc(features) #{logics: self.fc(features)}
         out = dict({"logits":prediction})
-        aux_logits=self.aux_fc(contextual_feature[:,-self.out_dim:])
+        # aux_logits=self.aux_fc(contextual_feature[:,-self.out_dim:])
 
         out.update({"aux_logits":aux_logits,"features":features})
         return out  # [b, num_steps, opt.num_class]
@@ -354,11 +365,11 @@ class DERNet(Model):
         """Prediction"""
         if opt.Prediction == "CTC":
             self.aux_fc = nn.Linear(self.SequenceModeling_output, num_class)
-            self.Prediction = self.aux_fc
+            self.aux_Prediction = self.aux_fc
             # self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
         elif opt.Prediction == "Attn":
             self.aux_fc = nn.Linear(opt.hidden_size, num_class)
-            self.Prediction = Attention(
+            self.aux_Prediction = Attention(
                 self.SequenceModeling_output, opt.hidden_size, num_class,self.aux_fc
             )
         else:

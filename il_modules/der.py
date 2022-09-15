@@ -49,6 +49,44 @@ class DER(BaseLearner):
             for i in range(taski):
                 self.model.module.model[i].eval()
 
+    def change_model(self,):
+        """ model configuration """
+        # model.module.reset_class(opt, device)
+        self.model.update_fc(self.opt.hidden_size, self._total_classes)
+        self.model.build_prediction(self.opt, self._total_classes)
+        self.model.build_aux_prediction(self.opt, self._total_classes)
+        # reset_class(self.model.module, self.device)
+        # data parallel for multi-GPU
+        self.model = torch.nn.DataParallel(self.model).to(self.device)
+        self.model.train()
+        # return self.model
+
+    def build_model(self):
+        """ model configuration """
+
+        self.model.update_fc(self.opt.hidden_size, self._total_classes)
+        self.model.build_prediction(self.opt, self._total_classes)
+        self.model.build_aux_prediction(self.opt, self._total_classes)
+
+        # weight initialization
+        for name, param in self.model.named_parameters():
+            if "localization_fc2" in name:
+                print(f"Skip {name} as it is already initialized")
+                continue
+            try:
+                if "bias" in name:
+                    init.constant_(param, 0.0)
+                elif "weight" in name:
+                    init.kaiming_normal_(param)
+            except Exception as e:  # for batchnorm.
+                if "weight" in name:
+                    param.data.fill_(1)
+                continue
+
+        # data parallel for multi-GPU
+        self.model = torch.nn.DataParallel(self.model).to(self.device)
+        self.model.train()
+
     def incremental_train(self, taski, character, train_loader, valid_loader):
 
         # pre task classes for know classes
@@ -62,9 +100,9 @@ class DER(BaseLearner):
             self.criterion = self.build_criterion()
             self.build_model()
 
-        if self._cur_task > 0:
-            for i in range(self._cur_task):
-                for p in self.model.model[i].parameters():
+        if taski > 0:
+            for i in range(taski):
+                for p in self.model.module.model[i].parameters():
                     p.requires_grad = False
 
         # filter that only require gradient descent
@@ -86,7 +124,7 @@ class DER(BaseLearner):
             else:
                 train_loader.get_dataset(taski, memory=self.opt.memory)
             self._update_representation(start_iter,taski, train_loader, valid_loader)
-            self.model.weight_align(self._total_classes - self._known_classes)
+            self.model.module.weight_align(self._total_classes - self._known_classes)
 
     def _init_train(self,start_iter,taski, train_loader, valid_loader):
         # loss averager
@@ -202,8 +240,8 @@ class DER(BaseLearner):
                 loss_aux = self.criterion(
                     aux_logits.view(-1, aux_logits.shape[-1]), aux_targets.contiguous().view(-1)
                 )
-            loss = loss_clf + loss_aux
-
+            # loss = loss_clf + loss_aux
+            loss = loss_clf
 
             self.model.zero_grad()
             loss.backward()
