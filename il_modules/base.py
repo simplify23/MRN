@@ -150,7 +150,7 @@ class BaseLearner(object):
             self.build_model()
 
         # filter that only require gradient descent
-        filtered_parameters = self.count_param()
+        filtered_parameters = self.count_param(self.model)
 
         # setup optimizer
         self.build_optimizer(filtered_parameters)
@@ -413,10 +413,24 @@ class BaseLearner(object):
         self.write_log(acc_log)
         return best_scores,ned_scores
 
-    def count_param(self):
+    # def count_param(self):
+    #     filtered_parameters = []
+    #     params_num = []
+    #     for p in filter(lambda p: p.requires_grad, self.model.parameters()):
+    #         filtered_parameters.append(p)
+    #         params_num.append(np.prod(p.size()))
+    #     print("Trainable params num: {:.2f} M".format(sum(params_num) / 1000000))
+    #     self.write_log("Trainable params num: {:.2f} M\n".format(sum(params_num) / 1000000))
+    #     return filtered_parameters
+
+    def count_param(self,model,trainable=True):
         filtered_parameters = []
         params_num = []
-        for p in filter(lambda p: p.requires_grad, self.model.parameters()):
+        if trainable == False:
+            params = sum(p.numel() for p in model.parameters())
+            print("All params num: {:.2f} M".format(params / 1000000))
+            self.write_log("All params num: {:.2f} M\n".format(params/ 1000000))
+        for p in filter(lambda p: p.requires_grad, model.parameters()):
             filtered_parameters.append(p)
             params_num.append(np.prod(p.size()))
         print("Trainable params num: {:.2f} M".format(sum(params_num) / 1000000))

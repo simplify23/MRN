@@ -119,7 +119,7 @@ class WA(BaseLearner):
                 train_loss_avg.reset()
         self.model.module.weight_align(self._total_classes - self._known_classes)
 
-    def _KD_loss(pred, soft, T):
-        pred = torch.log_softmax(pred / T, dim=1)
-        soft = torch.softmax(soft / T, dim=1)
-        return -1 * torch.mul(soft, pred).sum() / pred.shape[0]
+def _KD_loss(pred, soft, T):
+   pred = torch.log_softmax(pred / T, dim=1)
+   soft = torch.softmax(soft / T, dim=1)
+   return -1 * torch.mul(soft, pred).sum() / pred.shape[0]

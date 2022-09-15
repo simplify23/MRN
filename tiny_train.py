@@ -7,6 +7,7 @@ import argparse
 import il_modules
 from data.data_manage import Dataset_Manager
 from il_modules.base import BaseLearner
+from il_modules.der import DER
 from il_modules.ewc import EWC
 from il_modules.lwf import LwF
 from il_modules.wa import WA
@@ -284,6 +285,8 @@ def train(opt, log):
         learner = WA(opt)
     elif opt.il =="ewc":
         learner = EWC(opt)
+    elif opt.il == "der":
+        learner = DER(opt)
     else:
         learner = BaseLearner(opt)
 

@@ -47,7 +47,7 @@ class EWC(BaseLearner):
         if taski == 0:
             self._init_train(start_iter,taski, train_loader, valid_loader)
         else:
-            if self.opt.memory == "rehearsal":
+            if self.opt.memory == "rehearsal" or self.opt.memory == "random":
                 self.build_rehearsal_memory(train_loader, taski)
             else:
                 train_loader.get_dataset(taski, memory=self.opt.memory)

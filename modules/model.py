@@ -13,9 +13,9 @@ from modules.sequence_modeling import BidirectionalLSTM
 from modules.prediction import Attention
 
 
-class Model(nn.Module):
+class Model_Extractor(nn.Module):
     def __init__(self, opt, SelfSL_layer=False):
-        super(Model, self).__init__()
+        super(Model_Extractor, self).__init__()
         self.opt = opt
         self.stages = {
             "Trans": opt.Transformation,
@@ -70,55 +70,8 @@ class Model(nn.Module):
             else:
                 print("No SequenceModeling module specified")
                 self.SequenceModeling_output = self.FeatureExtraction_output
-        self.fc = None
-        self.Prediction=None
 
-        # if not SelfSL_layer:  # for STR.
-        #     """Prediction"""
-        #     if opt.Prediction == "CTC":
-        #         self.fc = nn.Linear(self.SequenceModeling_output, opt.num_class)
-        #         self.Prediction = self.fc
-        #         # self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
-        #     elif opt.Prediction == "Attn":
-        #         self.fc = nn.Linear(opt.hidden_size, opt.num_class)
-        #         self.Prediction = Attention(
-        #             self.SequenceModeling_output, opt.hidden_size, opt.num_class,self.fc
-        #         )
-        #     else:
-        #         raise Exception("Prediction is neither CTC or Attn")
-
-        # else:
-        #     """for self-supervised learning (SelfSL)"""
-        #     self.AdaptiveAvgPool_2 = nn.AdaptiveAvgPool2d((None, 1))  # make width -> 1
-        #     if SelfSL_layer == "CNN":
-        #         self.SelfSL_FFN_input = self.FeatureExtraction_output
-        #
-        #     if "RotNet" in self.opt.self:
-        #         self.SelfSL = nn.Linear(
-        #             self.SelfSL_FFN_input, 4
-        #         )  # 4 = [0, 90, 180, 270] degrees
-        #     elif "MoCo" in self.opt.self:
-        #         self.SelfSL = nn.Linear(
-        #             self.SelfSL_FFN_input, 128
-        #         )  # 128 is used for MoCo paper.
-
-    def reset_class(self, opt, device):
-
-        """Prediction"""
-        if opt.Prediction == "CTC":
-            self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
-        elif opt.Prediction == "Attn":
-            self.Prediction = Attention(
-                self.SequenceModeling_output, opt.hidden_size, opt.num_class
-            )
-        else:
-            raise Exception("Prediction is neither CTC or Attn")
-        
-        self.Prediction.to(device)
-    
-
-
-    def forward(self, image, text=None, is_train=True, SelfSL_layer=False):
+    def forward(self, image, SelfSL_layer=False):
         """Transformation stage"""
         if not self.stages["Trans"] == "None":
             image = self.Transformation(image)
@@ -152,6 +105,124 @@ class Model(nn.Module):
             )  # [b, num_steps, opt.hidden_size]
         else:
             contextual_feature = visual_feature  # for convenience. this is NOT contextually modeled by BiLSTM
+
+        return contextual_feature  # [b, num_steps, opt.num_class]
+
+
+
+class Model(nn.Module):
+    def __init__(self, opt, SelfSL_layer=False):
+        super(Model, self).__init__()
+        self.opt = opt
+        self.model = Model_Extractor(opt)
+        self.SequenceModeling_output = self.model.SequenceModeling_output
+        self.stages = {
+            # "Trans": opt.Transformation,
+            # "Feat": opt.FeatureExtraction,
+            # "Seq": opt.SequenceModeling,
+            "Pred": opt.Prediction,
+        }
+        #
+        # """ Transformation """
+        # if opt.Transformation == "TPS":
+        #     self.Transformation = TPS_SpatialTransformerNetwork(
+        #         F=opt.num_fiducial,
+        #         I_size=(opt.imgH, opt.imgW),
+        #         I_r_size=(opt.imgH, opt.imgW),
+        #         I_channel_num=opt.input_channel,
+        #     )
+        # else:
+        #     print("No Transformation module specified")
+        #
+        # """ FeatureExtraction """
+        # if opt.FeatureExtraction == "VGG":
+        #     self.FeatureExtraction = VGG_FeatureExtractor(
+        #         opt.input_channel, opt.output_channel
+        #     )
+        # elif opt.FeatureExtraction == "RCNN":
+        #     self.FeatureExtraction = RCNN_FeatureExtractor(
+        #         opt.input_channel, opt.output_channel
+        #     )
+        # elif opt.FeatureExtraction == "ResNet":
+        #     self.FeatureExtraction = ResNet_FeatureExtractor(
+        #         opt.input_channel, opt.output_channel
+        #     )
+        # else:
+        #     raise Exception("No FeatureExtraction module specified")
+        # self.FeatureExtraction_output = opt.output_channel
+        # self.AdaptiveAvgPool = nn.AdaptiveAvgPool2d(
+        #     (None, 1)
+        # )  # Transform final (imgH/16-1) -> 1
+        #
+        # if not SelfSL_layer:  # for STR
+        #     """Sequence modeling"""
+        #     if opt.SequenceModeling == "BiLSTM":
+        #         self.SequenceModeling = nn.Sequential(
+        #             BidirectionalLSTM(
+        #                 self.FeatureExtraction_output, opt.hidden_size, opt.hidden_size
+        #             ),
+        #             BidirectionalLSTM(
+        #                 opt.hidden_size, opt.hidden_size, opt.hidden_size
+        #             ),
+        #         )
+        #         self.SequenceModeling_output = opt.hidden_size
+        #     else:
+        #         print("No SequenceModeling module specified")
+        #         self.SequenceModeling_output = self.FeatureExtraction_output
+        self.fc = None
+        self.Prediction=None
+
+    def reset_class(self, opt, device):
+
+        """Prediction"""
+        if opt.Prediction == "CTC":
+            self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
+        elif opt.Prediction == "Attn":
+            self.Prediction = Attention(
+                self.SequenceModeling_output, opt.hidden_size, opt.num_class
+            )
+        else:
+            raise Exception("Prediction is neither CTC or Attn")
+        
+        self.Prediction.to(device)
+    
+
+
+    def forward(self, image, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        contextual_feature = self.convnets(image)
+        # if not self.stages["Trans"] == "None":
+        #     image = self.Transformation(image)
+        #
+        # """ Feature extraction stage """
+        # visual_feature = self.FeatureExtraction(image)
+        # visual_feature = visual_feature.permute(
+        #     0, 3, 1, 2
+        # )  # [b, c, h, w] -> [b, w, c, h]
+        # visual_feature = self.AdaptiveAvgPool(
+        #     visual_feature
+        # )  # [b, w, c, h] -> [b, w, c, 1]
+        # visual_feature = visual_feature.squeeze(3)  # [b, w, c, 1] -> [b, w, c]
+        #
+        # """ for self supervised learning on Feature extractor (CNN part) """
+        # if SelfSL_layer == "CNN":
+        #     visual_feature = visual_feature.permute(0, 2, 1)  # [b, w, c] -> [b, c, w]
+        #     visual_feature = self.AdaptiveAvgPool_2(
+        #         visual_feature
+        #     )  # [b, c, w] -> [b, c, 1]
+        #     visual_feature = visual_feature.squeeze(2)  # [b, c, 1] -> [b, c]
+        #     prediction_SelfSL = self.SelfSL(
+        #         visual_feature
+        #     )  # [b, c] -> [b, SelfSL_class]
+        #     return prediction_SelfSL
+        #
+        # """ Sequence modeling stage """
+        # if self.stages["Seq"] == "BiLSTM":
+        #     contextual_feature = self.SequenceModeling(
+        #         visual_feature
+        #     )  # [b, num_steps, opt.hidden_size]
+        # else:
+        #     contextual_feature = visual_feature  # for convenience. this is NOT contextually modeled by BiLSTM
 
         """ Prediction stage """
         if self.stages["Pred"] == "CTC":
@@ -211,3 +282,89 @@ class Model(nn.Module):
         self.eval()
 
         return self
+
+class DERNet(Model):
+    def __init__(self, opt):
+        super(DERNet,self).__init__(opt)
+        self.model = nn.ModuleList()
+        self.out_dim=None
+        self.fc = None
+        self.aux_fc=None
+        self.task_sizes = []
+
+    @property
+    def feature_dim(self):
+        if self.out_dim is None:
+            return 0
+        return self.out_dim*len(self.model)
+
+    def extract_vector(self, x):
+        features = [convnet(x) for convnet in self.model]
+        features = torch.cat(features, 1)
+        return features
+
+    def forward(self, image, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        features = [convnet(image) for convnet in self.model]
+        contextual_feature = torch.cat(features, 1)
+
+        """ Prediction stage """
+        if self.stages["Pred"] == "CTC":
+            prediction = self.Prediction(contextual_feature.contiguous())
+        else:
+            prediction = self.Prediction(
+                contextual_feature.contiguous(),
+                text,
+                is_train,
+                batch_max_length=self.opt.batch_max_length,
+            )
+        # out=self.fc(features) #{logics: self.fc(features)}
+        out = dict({"logits":prediction})
+        aux_logits=self.aux_fc(contextual_feature[:,-self.out_dim:])
+
+        out.update({"aux_logits":aux_logits,"features":features})
+        return out  # [b, num_steps, opt.num_class]
+
+    def update_fc(self, hidden_size, nb_classes,device=None):
+        if len(self.model)==0:
+            self.model.append(Model_Extractor(self.opt))
+        else:
+            self.model.append(Model_Extractor(self.opt))
+            self.model[-1].load_state_dict(self.model[-2].state_dict())
+
+        if self.out_dim is None:
+            self.out_dim=self.model[-1].SequenceModeling_output
+        fc = nn.Linear(hidden_size, nb_classes)
+        if self.fc is not None:
+            nb_output = self.fc.out_features
+            weight = copy.deepcopy(self.fc.weight.data)
+            bias = copy.deepcopy(self.fc.bias.data)
+            fc.weight.data[:nb_output,:self.feature_dim-self.out_dim] = weight
+            fc.bias.data[:nb_output] = bias
+
+        del self.fc
+        self.fc = fc
+
+        new_task_size = nb_classes - sum(self.task_sizes)
+        self.task_sizes.append(new_task_size)
+
+        self.aux_fc= nn.Linear(self.out_dim,new_task_size+1)
+
+    def build_aux_prediction(self,opt,num_class):
+        """Prediction"""
+        if opt.Prediction == "CTC":
+            self.aux_fc = nn.Linear(self.SequenceModeling_output, num_class)
+            self.Prediction = self.aux_fc
+            # self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
+        elif opt.Prediction == "Attn":
+            self.aux_fc = nn.Linear(opt.hidden_size, num_class)
+            self.Prediction = Attention(
+                self.SequenceModeling_output, opt.hidden_size, num_class,self.aux_fc
+            )
+        else:
+            raise Exception("Prediction is neither CTC or Attn")
+
+    def freeze_conv(self):
+        for param in self.model.parameters():
+            param.requires_grad = False
+        self.model.eval()

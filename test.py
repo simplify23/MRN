@@ -161,6 +161,8 @@ def validation(model, criterion, eval_loader, converter, opt, tqdm_position=1):
         if "CTC" in opt.Prediction:
             start_time = time.time()
             preds = model(image)
+            if len(preds)==3:
+                preds = preds['logits']
             forward_time = time.time() - start_time
 
             # Calculate evaluation loss for CTC deocder.
@@ -180,6 +182,8 @@ def validation(model, criterion, eval_loader, converter, opt, tqdm_position=1):
 
             start_time = time.time()
             preds = model(image, text_for_pred, is_train=False)
+            if len(preds)==3:
+                preds = preds['logits']
             forward_time = time.time() - start_time
 
             target = labels_index[:, 1:]  # without [SOS] Symbol
