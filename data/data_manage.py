@@ -23,7 +23,7 @@ class Dataset_Manager(object):
 
         dataset = self.create_dataset(data_list=self.select_data,taski=taski)
 
-        if memory == "random" or memory == "rehearsal":
+        if memory == "random" or memory == "rehearsal" or memory=="bag":
             memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=2000,index_array=index_list)
             self.create_dataloader(memory_data,(self.opt.batch_size)//2)
             self.create_dataloader(dataset,(self.opt.batch_size)//2)
@@ -102,6 +102,10 @@ class Dataset_Manager(object):
         )
         return data_loader,len(dataset)
 
+    def rehearsal_prev_dataset(self,taski,):
+        select_data = self.select_data
+        dataset = self.create_dataset(data_list=select_data,taski=taski-1,repeat=False)
+        return dataset,len(dataset)
 
     def create_dataset(self, data_list="/", taski=0, mode="train", repeat=True):
         """select_data is list for all dataset"""
