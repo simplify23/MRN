@@ -345,7 +345,7 @@ class DERNet(Model):
 
         if self.out_dim is None:
             self.out_dim=self.model[-1].SequenceModeling_output
-        fc = nn.Linear(hidden_size, nb_classes)
+        fc = nn.Linear(self.feature_dim, nb_classes)
         if self.fc is not None:
             nb_output = self.fc.out_features
             weight = copy.deepcopy(self.fc.weight.data)
