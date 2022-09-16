@@ -1,32 +1,19 @@
-# What If We Only Use Real Datasets for Scene Text Recognition? Toward Scene Text Recognition With Fewer Labels
-Official PyTorch implementation of CIL_MLTSTR | [paper](https://arxiv.org/abs/2103.04400) | [training and evaluation data](https://github.com/ku21fan/STR-Fewer-Labels/blob/main/data.md) | [pretrained model](#pretrained_models) |
+
+Official PyTorch implementation of CIL_MLTSTR
 
 **best config setting for MLT17+MLT19 = 200000 iter**
+TODO
+## To Do List
+* [x] base
+* [x] lwf
+* [x] ewc
+* [x] wa
+* [x] random_memory
+* [x] loss_memory
+* [ ] der
+* [ ] queue_bag_memory
 
 
-
-The University of Tokyo.
-
-1. In STR field, **real data was too small < 10K images.** <br>
-→ There is Implicit common knowledge “We should use synthetic data, since we don't have enough real data to train models sufficiently.” <br>
-→ All state-of-the-art (SOTA) methods use large synthetic data (16M). <br>
-→ **Problem: the study of training STR with fewer real labels is insufficient.** If you wonder about the detail, such as why this is a problem, please refer to our paper and supplement.
-
-2. **We disprove the common knowledge by consolidating recently accumulated public real data and showing that we can train STR models sufficiently with fewer real labels (276K = 1.7% of large synthetic data 16M).**
-In our work, “sufficiently trained” means that the model has similar accuracy as the model trained on large synthetic data, as shown below figure.
-
-3. Subsequently, as a baseline study of STR with fewer labels, we apply simple data augmentations and semi- and self-supervised learning methods.
-As a result, **we obtain a competitive model with only real data, which has better accuracy than the model trained on large synthetic data and similar accuracy to other SOTA methods that use large synthetic data. (see Table 2 in our paper)**
-
-This work is a stepping stone toward STR with fewer labels, and we hope this work will facilitate future work on this topic.
-
-<img src="teaser.png" width="50%" title="teaser">
-
-
-
-## News
-- **Jun 5, 2021**: Initial upload
-- **Mar 1, 2021**: The paper is accepted at CVPR2021.
 
 ## Getting Started
 ### Dependency
@@ -58,21 +45,6 @@ There are 2 models (CRNN or TRBA) and 5 different settings of each model.
    CUDA_VISIBLE_DEVICES=0 python3 demo.py --model_name TRBA --image_folder demo_image/ \
    --saved_model TRBA-Baseline-real.pth
    ```
-
-#### prediction results
-| demo images | [TRBA-Baseline-synth](https://www.dropbox.com/sh/23adceu2i85c4x1/AAB-AANFt__wvVvBowXgkfwka/TRBA-Baseline-synth.pth?dl=0) | [TRBA-Baseline-real](https://www.dropbox.com/sh/23adceu2i85c4x1/AABEIFnvyoTfFxwb2hJAm-q6a/TRBA-Baseline-real.pth?dl=0) |
-| ---         |     ---      |          --- |
-| <img src="./demo_image/1.png" width="300" height="100">    |   (ccaloola. | Coca-Cola   |
-| <img src="./demo_image/2.png" width="300" height="100">    |   Line       | Hire        |
-| <img src="./demo_image/3.png" width="300" height="100">    |   Lugh       | Laugh       |
-| <img src="./demo_image/4.png" width="300" height="100">    |   Gaf        | Cafe        |
-| <img src="./demo_image/5.jpg" width="300" height="100">    |   upbege     | BARBREQUE   |
-| <img src="./demo_image/6.jpg" width="300" height="100">    |   PEOPLE     | PEORLE      |
-| <img src="./demo_image/7.png" width="300" height="100">    |   Esciting   | ExCiting    |
-| <img src="./demo_image/8.png" width="300" height="100">    |   Signs      | Signs       |
-| <img src="./demo_image/9.jpg" width="300" height="100">    |   BALLY      | BALLYS      |
-| <img src="./demo_image/10.jpg" width="300" height="100">   |   SHAKESHACK | SHAKE SHACK |
-
 
 ### Training
 1. Train CRNN model with only real data.
