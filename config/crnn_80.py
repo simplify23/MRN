@@ -1,6 +1,6 @@
 common=dict(
     exp_name="CRNN_der_random",  # Where to store logs and models
-    il="der",  # base | lwf | wa | ewc
+    il="der",  # base | lwf | wa | ewc ｜ der
     memory="random", #rehearsal random
     memory_num=2000,
     batch_max_length = 25,
@@ -56,7 +56,7 @@ train = dict(
     total_data_usage_ratio="1.0",
     NED=True,
     batch_size=256,
-    num_iter=10000,
+    num_iter=20,
     val_interval=5000,
     log_multiple_test=None,
     FT="init",

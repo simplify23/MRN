@@ -190,7 +190,7 @@ class Model(nn.Module):
 
     def forward(self, image, text=None, is_train=True, SelfSL_layer=False):
         """Transformation stage"""
-        contextual_feature = self.convnets(image)
+        contextual_feature = self.model(image)
         # if not self.stages["Trans"] == "None":
         #     image = self.Transformation(image)
         #
@@ -306,7 +306,7 @@ class DERNet(Model):
     def forward(self, image, text=None, is_train=True, SelfSL_layer=False):
         """Transformation stage"""
         features = [convnet(image) for convnet in self.model]
-        contextual_feature = torch.cat(features, 1)
+        contextual_feature = torch.cat(features, -1)
 
         """ Prediction stage """
         if self.stages["Pred"] == "CTC":
@@ -333,7 +333,7 @@ class DERNet(Model):
         out = dict({"logits":prediction})
         # aux_logits=self.aux_fc(contextual_feature[:,-self.out_dim:])
 
-        out.update({"aux_logits":aux_logits,"features":features})
+        out.update({"aux_logits":aux_logits,"features":contextual_feature.contiguous()})
         return out  # [b, num_steps, opt.num_class]
 
     def update_fc(self, hidden_size, nb_classes,device=None):
