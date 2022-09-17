@@ -1,7 +1,7 @@
 import os
 import time
 from collections import defaultdict
-from queue import Queue
+from queue import Queue,PriorityQueue
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -15,6 +15,16 @@ from tools.utils import CTCLabelConverter, AttnLabelConverter, Averager, adjust_
 from data.dataset import hierarchical_dataset, AlignCollate, Batch_Balanced_Dataset
 from modules.model import Model
 from test import validation, benchmark_all_eval
+class bag_value():
+    def __init__(self,bag):
+        self.label, = bag
+        self.bag = bag
+        self.index, = bag.values()
+        self.len_label = len(self.label)
+    def __lt__(self, other):
+        if self.len_label !=other.len_label:
+            return self.len_label > other.len_label
+        return self.label > other.label
 
 class BaseLearner(object):
     def __init__(self, opt):
@@ -329,26 +339,32 @@ class BaseLearner(object):
             data_len[labels_length].append({labels:index})
             if labels_length > max_length:
                 max_length = labels_length
-        queue = [Queue() for i in range(max_length)]
+        # queue = [Queue() for i in range(max_length)]
+        queue = [PriorityQueue() for i in range(max_length)]
         for i in range(max_length):
             # max-(0:max-1)  -> max : 1
             len_label = max_length - i
-            # print("starting {}--------".format(len_label))
+            print("starting {}--------".format(len_label))
             if i!=0:
                 for j in range(queue[len_label].qsize()):
-                    label = queue[len_label].get()
+                    label = queue[len_label].get().bag
+                    # label = queue[len_label].get()
                     char,queue,index_array = self.if_put_label(label,char, queue,len_label,index_array)
 
             if data_len[len_label] == []:
                 continue
             for label in data_len[len_label]:
                 char,queue,index_array= self.if_put_label(label, char, queue,len_label,index_array)
-        for j in range(queue[0].qsize()):
-            label = queue[0].get()
-            char, queue,index_array= self.if_put_label(label, char, queue,0,index_array)
             if len(index_array) > taski_num:
                 break
-        print("samples get chars {}--------".format(len(char)))
+        # print("starting {}--------".format(0))
+        for j in range(queue[0].qsize()):
+            if len(index_array) > taski_num:
+                break
+            # label = queue[0].get()
+            label = queue[0].get().bag
+            char, queue,index_array= self.if_put_label(label, char, queue,0,index_array)
+        print("samples get array {}--------".format(len(index_array)))
         self.memory_index.append(np.array(index_array[:taski_num]))
 
 
@@ -367,7 +383,8 @@ class BaseLearner(object):
             # print(string)
             char.update(tmp_char)
         else:
-            queue[label_v].put(label)
+            queue[label_v].put(bag_value(label))
+            # queue[label_v].put(label)
         return char,queue,index_array
 
     def val(self, valid_loader, opt, best_score, start_time, iteration,
@@ -478,7 +495,7 @@ class BaseLearner(object):
         ned_scores.append(round(sum(ned_accs) / len(ned_accs),2))
 
         acc_log= f'Task {taski} Test Average Incremental Accuracy: {best_scores[taski]} \n Task {taski} Incremental Accuracy: {task_accs}\n ned_acc: {ned_accs}\n'
-        self.write_data_log(f'{taski} Avg Acc: {best_scores[taski]:0.2f} \n  acc: {task_accs}\n ned_acc: {ned_accs}\n')
+        self.write_data_log(f'{taski} Avg Acc: {best_scores[taski]:0.2f} \n  acc: {task_accs}\n')
 
         print(acc_log)
         self.write_log(acc_log)

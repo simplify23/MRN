@@ -351,6 +351,7 @@ def train(opt, log):
     print(
             'ALL Average Incremental Accuracy: {:.2f} '.format(sum(best_scores)/len(best_scores))
         )
+    write_data_log('ALL Average Acc: {:.2f} '.format(sum(best_scores)/len(best_scores)))
 
 def val(model, criterion, valid_loader, converter, opt,optimizer,best_score,start_time,iteration,train_loss_avg,taski):
     with open(f"./saved_models/{opt.exp_name}/log_train.txt", "a") as log:
