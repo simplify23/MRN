@@ -262,11 +262,11 @@ class Model(nn.Module):
     def build_prediction(self,opt,num_class):
         """Prediction"""
         if opt.Prediction == "CTC":
-            self.fc = nn.Linear(self.SequenceModeling_output, num_class)
+            # self.fc = nn.Linear(self.SequenceModeling_output, num_class)
             self.Prediction = self.fc
             # self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
         elif opt.Prediction == "Attn":
-            self.fc = nn.Linear(opt.hidden_size, num_class)
+            # self.fc = nn.Linear(opt.hidden_size, num_class)
             self.Prediction = Attention(
                 self.SequenceModeling_output, opt.hidden_size, num_class,self.fc
             )
@@ -321,7 +321,7 @@ class DERNet(Model):
 
         """ Prediction stage """
         if self.stages["Pred"] == "CTC":
-            aux_logits = self.aux_Prediction(contextual_feature[:,-self.out_dim:].contiguous())
+            aux_logits = self.aux_Prediction(contextual_feature[:,:,-self.out_dim:].contiguous())
         else:
             aux_logits = self.aux_Prediction(
                 contextual_feature[:,-self.out_dim:].contiguous(),
@@ -364,11 +364,11 @@ class DERNet(Model):
     def build_aux_prediction(self,opt,num_class):
         """Prediction"""
         if opt.Prediction == "CTC":
-            self.aux_fc = nn.Linear(self.SequenceModeling_output, num_class)
+            # self.aux_fc = nn.Linear(self.SequenceModeling_output, num_class)
             self.aux_Prediction = self.aux_fc
             # self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
         elif opt.Prediction == "Attn":
-            self.aux_fc = nn.Linear(opt.hidden_size, num_class)
+            # self.aux_fc = nn.Linear(opt.hidden_size, num_class)
             self.aux_Prediction = Attention(
                 self.SequenceModeling_output, opt.hidden_size, num_class,self.aux_fc
             )

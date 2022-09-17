@@ -8,6 +8,7 @@ from torch import nn
 from torch import optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
+import torch.nn.init as init
 from il_modules.base import BaseLearner
 from modules.model import DERNet
 from test import validation
@@ -152,6 +153,7 @@ class DER(BaseLearner):
             # default recognition loss part
             if "CTC" in self.opt.Prediction:
                 preds = self.model(image)['logits']
+                # preds = self.model(image)
                 preds_size = torch.IntTensor([preds.size(1)] * batch_size)
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
                 loss = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
