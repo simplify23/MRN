@@ -82,20 +82,20 @@ class BaseLearner(object):
         self.model.train()
         # return model
 
-    def build_optimizer(self,filtered_parameters,scale=1.0):
+    def build_optimizer(self,filtered_parameters):
         if self.opt.optimizer == "sgd":
             optimizer = torch.optim.SGD(
                 filtered_parameters,
-                lr=self.opt.lr * scale,
+                lr=self.opt.lr,
                 momentum=self.opt.sgd_momentum,
                 weight_decay=self.opt.sgd_weight_decay,
             )
         elif self.opt.optimizer == "adadelta":
             optimizer = torch.optim.Adadelta(
-                filtered_parameters, lr=self.opt.lr * scale, rho=self.opt.rho, eps=self.opt.eps
+                filtered_parameters, lr=self.opt.lr, rho=self.opt.rho, eps=self.opt.eps
             )
         elif self.opt.optimizer == "adam":
-            optimizer = torch.optim.Adam(filtered_parameters, lr=self.opt.lr * scale)
+            optimizer = torch.optim.Adam(filtered_parameters, lr=self.opt.lr)
         # print("optimizer:")
         # print(optimizer)
         self.optimizer = optimizer
@@ -109,7 +109,7 @@ class BaseLearner(object):
 
             scheduler = torch.optim.lr_scheduler.OneCycleLR(
                 optimizer,
-                max_lr=self.opt.lr * scale,
+                max_lr=self.opt.lr,
                 cycle_momentum=cycle_momentum,
                 div_factor=20,
                 final_div_factor=1000,
@@ -268,7 +268,7 @@ class BaseLearner(object):
         # Calculate the means of old classes with newly trained network
         memory_num = self.opt.memory_num
         num_i = int(memory_num / (taski))
-        if self.opt.memory == "rehearsal" or self.opt.memory == "loss_max" or self.opt.memory == "cof_max":
+        if self.opt.memory == "rehearsal":
             self.build_current_memory(num_i,taski,train_loader)
         elif self.opt.memory == "bag":
             self.build_queue_bag_memory(num_i, taski, train_loader)
@@ -277,7 +277,7 @@ class BaseLearner(object):
         else:
             self.build_random_current_memory(num_i, taski, train_loader)
         if len(self.memory_index) != 0 and len(self.memory_index)*len(self.memory_index[0]) > memory_num:
-            if self.opt.memory == "rehearsal":
+            if self.opt.memory != "rehearsal":
                 self.reduce_div_samplers(taski, taski_num=num_i)
             else:
                 self.reduce_samplers(taski,taski_num =num_i)
@@ -292,44 +292,33 @@ class BaseLearner(object):
 
     def build_current_memory(self, taski_num, taski, train_loader):
         prev_loader, len_data = train_loader.rehearsal_prev_model(taski)
-        # criterion = self.build_criterion("none")
+        criterion = self.build_criterion("none")
         loss = []
-        seq = []
         for i, (image_tensors, labels) in enumerate(prev_loader):
             image = image_tensors.to(self.device)
-            # labels_index, labels_length = self.converter.encode(
-            #     labels, batch_max_length=self.opt.batch_max_length
-            # )
-            # batch_size = image.size(0)
-            preds = self._old_network(image)
-            preds_list = torch.max(preds,-1)[0].cpu()
-            for pred_seq in preds_list:
-                cof = 0.0
-                for ch_cof in pred_seq:
-                    # cof *=ch_cof
-                    cof += ch_cof
-                seq.append(cof/len(pred_seq))
+            labels_index, labels_length = self.converter.encode(
+                labels, batch_max_length=self.opt.batch_max_length
+            )
+            batch_size = image.size(0)
             # default recognition loss part
-        #     if "CTC" in self.opt.Prediction:
-        #         preds = self._old_network(image)
-        #         preds_size = torch.IntTensor([preds.size(1)] * batch_size)
-        #         # B，T，C(max) -> T, B, C
-        #         preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
-        #         loss_clf = criterion(preds_log_softmax, labels_index, preds_size, labels_length)
-        #     else:
-        #         preds = self.model(image, labels_index[:, :-1])  # align with Attention.forward
-        #         target = labels_index[:, 1:]  # without [SOS] Symbol
-        #         loss_clf = criterion(
-        #             preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
-        #         )
-        #     loss.append(loss_clf.cpu())
-        # loss = torch.cat(loss)
-        max_v, max_i = torch.topk(torch.Tensor(seq), k=int(taski_num), sorted=True, largest=True)
-        # min_v, min_i = torch.topk(loss, k=int(taski_num/2), sorted=True, largest=False)
-        # max_v, max_i = torch.topk(loss, k=int(taski_num), sorted=True, largest=True)
+            if "CTC" in self.opt.Prediction:
+                preds = self._old_network(image)
+                preds_size = torch.IntTensor([preds.size(1)] * batch_size)
+                # B，T，C(max) -> T, B, C
+                preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
+                loss_clf = criterion(preds_log_softmax, labels_index, preds_size, labels_length)
+            else:
+                preds = self.model(image, labels_index[:, :-1])  # align with Attention.forward
+                target = labels_index[:, 1:]  # without [SOS] Symbol
+                loss_clf = criterion(
+                    preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
+                )
+            loss.append(loss_clf.cpu())
+        loss = torch.cat(loss)
+        min_v, min_i = torch.topk(loss, k=int(taski_num/2), sorted=True, largest=False)
+        max_v, max_i = torch.topk(loss, k=int(taski_num/2), sorted=True, largest=True)
         # index = torch.cat([max_i,min_i]).numpy(),0)
-        # self.memory_index.append(torch.cat([max_i,min_i]).numpy())
-        self.memory_index.append((max_i).numpy())
+        self.memory_index.append(torch.cat([max_i,min_i]).numpy())
 
     def reduce_div_samplers(self,taski,taski_num):
         div = taski_num//2
@@ -364,18 +353,16 @@ class BaseLearner(object):
         for index in range(len_data):
             (image_tensor, label) = prev_dataset[index]
             labels_length = len(label)
-            if labels_length == 0:
-                continue
             label_score = 0.0
             for ch in label:
                 if char.get(ch, None) != None:
-                    label_score += pow(char[ch],-1.5)
+                    label_score += pow(char[ch],-2)
             label_score = label_score / labels_length
             index_array.append(Label(label,index,label_score))
 
         # queue = [Queue() for i in range(max_length)]
         index_array = sorted(index_array)[:taski_num]
-        data_list = [label_c.index for label_c in index_array]
+        data_list = [label_c.label for label_c in index_array]
         print("samples get array {}--------".format(len(data_list)))
         self.memory_index.append(np.array(data_list))
 
