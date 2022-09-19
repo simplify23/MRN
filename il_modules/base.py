@@ -268,7 +268,7 @@ class BaseLearner(object):
         # Calculate the means of old classes with newly trained network
         memory_num = self.opt.memory_num
         num_i = int(memory_num / (taski))
-        if self.opt.memory == "rehearsal":
+        if self.opt.memory == "rehearsal" or self.opt.memory == "loss_max":
             self.build_current_memory(num_i,taski,train_loader)
         elif self.opt.memory == "bag":
             self.build_queue_bag_memory(num_i, taski, train_loader)
@@ -277,11 +277,12 @@ class BaseLearner(object):
         else:
             self.build_random_current_memory(num_i, taski, train_loader)
         if len(self.memory_index) != 0 and len(self.memory_index)*len(self.memory_index[0]) > memory_num:
-            if self.opt.memory != "rehearsal":
+            if self.opt.memory == "rehearsal":
                 self.reduce_div_samplers(taski, taski_num=num_i)
             else:
                 self.reduce_samplers(taski,taski_num =num_i)
         train_loader.get_dataset(taski,memory=self.opt.memory,index_list=self.memory_index)
+        print("------using memory {}".format(self.opt.memory ))
         print("Is using rehearsal memory, has {} prev datasets, each has {}\n".format(len(self.memory_index),self.memory_index[0].size))
 
 
@@ -315,10 +316,11 @@ class BaseLearner(object):
                 )
             loss.append(loss_clf.cpu())
         loss = torch.cat(loss)
-        min_v, min_i = torch.topk(loss, k=int(taski_num/2), sorted=True, largest=False)
-        max_v, max_i = torch.topk(loss, k=int(taski_num/2), sorted=True, largest=True)
+        # min_v, min_i = torch.topk(loss, k=int(taski_num/2), sorted=True, largest=False)
+        max_v, max_i = torch.topk(loss, k=int(taski_num), sorted=True, largest=True)
         # index = torch.cat([max_i,min_i]).numpy(),0)
-        self.memory_index.append(torch.cat([max_i,min_i]).numpy())
+        # self.memory_index.append(torch.cat([max_i,min_i]).numpy())
+        self.memory_index.append((max_i).numpy())
 
     def reduce_div_samplers(self,taski,taski_num):
         div = taski_num//2
@@ -353,16 +355,18 @@ class BaseLearner(object):
         for index in range(len_data):
             (image_tensor, label) = prev_dataset[index]
             labels_length = len(label)
+            if labels_length == 0:
+                continue
             label_score = 0.0
             for ch in label:
                 if char.get(ch, None) != None:
-                    label_score += pow(char[ch],-2)
+                    label_score += pow(char[ch],-1.5)
             label_score = label_score / labels_length
             index_array.append(Label(label,index,label_score))
 
         # queue = [Queue() for i in range(max_length)]
         index_array = sorted(index_array)[:taski_num]
-        data_list = [label_c.label for label_c in index_array]
+        data_list = [label_c.index for label_c in index_array]
         print("samples get array {}--------".format(len(data_list)))
         self.memory_index.append(np.array(data_list))
 
