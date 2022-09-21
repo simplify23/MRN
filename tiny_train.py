@@ -8,6 +8,7 @@ import il_modules
 from data.data_manage import Dataset_Manager
 from il_modules.base import BaseLearner
 from il_modules.der import DER
+from il_modules.ensemble import Ensem
 from il_modules.ewc import EWC
 from il_modules.lwf import LwF
 from il_modules.wa import WA
@@ -54,10 +55,6 @@ def load_dict(path,char,tmp_char):
     for ch in ch_list:
         if char.get(ch, None) == None:
             char[ch] = 1
-        if tmp_char.get(ch, None) == None:
-            tmp_char[ch] = 1
-        else:
-            tmp_char[ch] +=1
     for key, value in char.items():
         character.append(key)
     print("dict has {} number characters\n".format(len(character)))
@@ -68,8 +65,6 @@ def count_char_score(tmp_char):
     gamma = 2.0
     weights = []
     for key, value in tmp_char.items():
-        if value > 2:
-            print("values:{} {}".format(key,value))
         effective_num = 1.0 - np.power(beta, value)
         weights.append((1.0 - beta) / np.array(effective_num))
     weights = weights / np.sum(weights) * len(tmp_char)
@@ -287,6 +282,8 @@ def train(opt, log):
         learner = EWC(opt)
     elif opt.il == "der":
         learner = DER(opt)
+    elif opt.il =="ems":
+        learner = Ensem(opt)
     else:
         learner = BaseLearner(opt)
 
@@ -321,7 +318,7 @@ def train(opt, log):
                 opt.character = load_dict(train_data,char)
             else:
                 opt.character,tmp_char = load_dict(data_path+f"/{opt.lan_list[taski]}",char,tmp_char)
-        char_score = count_char_score(tmp_char)
+        # char_score = count_char_score(tmp_char)
         AlignCollate_valid = AlignCollate(opt, mode="test")
         valid_dataset, valid_dataset_log = hierarchical_dataset(
             root=valid_data, opt=opt, mode="test"

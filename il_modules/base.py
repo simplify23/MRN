@@ -23,8 +23,19 @@ class bag_value():
         self.len_label = len(self.label)
     def __lt__(self, other):
         if self.len_label !=other.len_label:
-            return self.len_label > other.len_label
+            return self.len_label < other.len_label
         return self.label > other.label
+
+class Label():
+    def __init__(self,label,index,score):
+        self.label = label
+        self.index = index
+        self.score = score
+        # self.len_label = len(self.label)
+    def __lt__(self, other):
+        if self.score !=other.score:
+            return self.score > other.score
+        return len(self.label) < len(other.label)
 
 class BaseLearner(object):
     def __init__(self, opt):
@@ -182,11 +193,10 @@ class BaseLearner(object):
         self._train(start_iter,taski, train_loader, valid_loader)
 
     def _train(self, start_iter,taski, train_loader, valid_loader):
-        # self.build_queue_bag_memory(taski, taski_num=200, train_loader)
         if taski == 0:
             self._init_train(start_iter,taski, train_loader, valid_loader)
         else:
-            if self.opt.memory == "rehearsal" or self.opt.memory == "random" or self.opt.memory=="bag":
+            if self.opt.memory != None:
                 self.build_rehearsal_memory(train_loader, taski)
             else:
                 train_loader.get_dataset(taski, memory=self.opt.memory)
@@ -258,14 +268,16 @@ class BaseLearner(object):
         # Calculate the means of old classes with newly trained network
         memory_num = self.opt.memory_num
         num_i = int(memory_num / (taski))
-        if self.opt.memory == "rehearsal":
+        if self.opt.memory == "rehearsal" or self.opt.memory == "loss_max" or self.opt.memory == "cof_max":
             self.build_current_memory(num_i,taski,train_loader)
         elif self.opt.memory == "bag":
             self.build_queue_bag_memory(num_i, taski, train_loader)
+        elif self.opt.memory == "score":
+            self.dataset_label_score(num_i, taski, train_loader)
         else:
             self.build_random_current_memory(num_i, taski, train_loader)
         if len(self.memory_index) != 0 and len(self.memory_index)*len(self.memory_index[0]) > memory_num:
-            if self.opt.memory != "rehearsal":
+            if self.opt.memory == "rehearsal":
                 self.reduce_div_samplers(taski, taski_num=num_i)
             else:
                 self.reduce_samplers(taski,taski_num =num_i)
@@ -280,33 +292,44 @@ class BaseLearner(object):
 
     def build_current_memory(self, taski_num, taski, train_loader):
         prev_loader, len_data = train_loader.rehearsal_prev_model(taski)
-        criterion = self.build_criterion("none")
+        # criterion = self.build_criterion("none")
         loss = []
+        seq = []
         for i, (image_tensors, labels) in enumerate(prev_loader):
             image = image_tensors.to(self.device)
-            labels_index, labels_length = self.converter.encode(
-                labels, batch_max_length=self.opt.batch_max_length
-            )
-            batch_size = image.size(0)
+            # labels_index, labels_length = self.converter.encode(
+            #     labels, batch_max_length=self.opt.batch_max_length
+            # )
+            # batch_size = image.size(0)
+            preds = self._old_network(image)
+            preds_list = torch.max(preds,-1)[0].cpu()
+            for pred_seq in preds_list:
+                cof = 0.0
+                for ch_cof in pred_seq:
+                    # cof *=ch_cof
+                    cof += ch_cof
+                seq.append(cof/len(pred_seq))
             # default recognition loss part
-            if "CTC" in self.opt.Prediction:
-                preds = self._old_network(image)
-                preds_size = torch.IntTensor([preds.size(1)] * batch_size)
-                # B，T，C(max) -> T, B, C
-                preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
-                loss_clf = criterion(preds_log_softmax, labels_index, preds_size, labels_length)
-            else:
-                preds = self.model(image, labels_index[:, :-1])  # align with Attention.forward
-                target = labels_index[:, 1:]  # without [SOS] Symbol
-                loss_clf = criterion(
-                    preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
-                )
-            loss.append(loss_clf.cpu())
-        loss = torch.cat(loss)
-        min_v, min_i = torch.topk(loss, k=int(taski_num/2), sorted=True, largest=False)
-        max_v, max_i = torch.topk(loss, k=int(taski_num/2), sorted=True, largest=True)
+        #     if "CTC" in self.opt.Prediction:
+        #         preds = self._old_network(image)
+        #         preds_size = torch.IntTensor([preds.size(1)] * batch_size)
+        #         # B，T，C(max) -> T, B, C
+        #         preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
+        #         loss_clf = criterion(preds_log_softmax, labels_index, preds_size, labels_length)
+        #     else:
+        #         preds = self.model(image, labels_index[:, :-1])  # align with Attention.forward
+        #         target = labels_index[:, 1:]  # without [SOS] Symbol
+        #         loss_clf = criterion(
+        #             preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
+        #         )
+        #     loss.append(loss_clf.cpu())
+        # loss = torch.cat(loss)
+        max_v, max_i = torch.topk(torch.Tensor(seq), k=int(taski_num), sorted=True, largest=True)
+        # min_v, min_i = torch.topk(loss, k=int(taski_num/2), sorted=True, largest=False)
+        # max_v, max_i = torch.topk(loss, k=int(taski_num), sorted=True, largest=True)
         # index = torch.cat([max_i,min_i]).numpy(),0)
-        self.memory_index.append(torch.cat([max_i,min_i]).numpy())
+        # self.memory_index.append(torch.cat([max_i,min_i]).numpy())
+        self.memory_index.append((max_i).numpy())
 
     def reduce_div_samplers(self,taski,taski_num):
         div = taski_num//2
@@ -324,6 +347,39 @@ class BaseLearner(object):
             self.memory_index[i] = index
             print("----using memory {}".format(self.memory_index[i].size))
 
+    def dataset_label_score(self, taski_num, taski, train_loader):
+        prev_dataset, len_data = train_loader.rehearsal_prev_dataset(taski)
+        char = {}
+        # queue = PriorityQueue()
+        # max_length = 0
+        index_array = []
+        for index in range(len_data):
+            (image_tensor, label) = prev_dataset[index]
+            for ch in label:
+                if char.get(ch, None) == None:
+                    char[ch] = 1
+                else:
+                    char[ch] +=1
+        # print(char)
+        for index in range(len_data):
+            (image_tensor, label) = prev_dataset[index]
+            labels_length = len(label)
+            if labels_length == 0:
+                continue
+            label_score = 0.0
+            for ch in label:
+                if char.get(ch, None) != None:
+                    label_score += pow(char[ch],-1.5)
+            label_score = label_score / labels_length
+            index_array.append(Label(label,index,label_score))
+
+        # queue = [Queue() for i in range(max_length)]
+        index_array = sorted(index_array)[:taski_num]
+        data_list = [label_c.index for label_c in index_array]
+        print("samples get array {}--------".format(len(data_list)))
+        self.memory_index.append(np.array(data_list))
+
+
     def build_queue_bag_memory(self, taski_num, taski, train_loader):
         prev_dataset, len_data = train_loader.rehearsal_prev_dataset(taski)
         data_len = defaultdict(list)
@@ -339,16 +395,16 @@ class BaseLearner(object):
             data_len[labels_length].append({labels:index})
             if labels_length > max_length:
                 max_length = labels_length
-        # queue = [Queue() for i in range(max_length)]
-        queue = [PriorityQueue() for i in range(max_length)]
+        queue = [Queue() for i in range(max_length)]
+        # queue = [PriorityQueue() for i in range(max_length)]
         for i in range(max_length):
             # max-(0:max-1)  -> max : 1
             len_label = max_length - i
-            print("starting {}--------".format(len_label))
+            # print("starting {}--------".format(len_label))
             if i!=0:
                 for j in range(queue[len_label].qsize()):
-                    label = queue[len_label].get().bag
-                    # label = queue[len_label].get()
+                    # label = queue[len_label].get().bag
+                    label = queue[len_label].get()
                     char,queue,index_array = self.if_put_label(label,char, queue,len_label,index_array)
 
             if data_len[len_label] == []:
@@ -358,11 +414,12 @@ class BaseLearner(object):
             if len(index_array) > taski_num:
                 break
         # print("starting {}--------".format(0))
+        print("task need {}, the lan need {}\n".format(taski_num,len(index_array)))
         for j in range(queue[0].qsize()):
             if len(index_array) > taski_num:
                 break
-            # label = queue[0].get()
-            label = queue[0].get().bag
+            label = queue[0].get()
+            # label = queue[0].get().bag
             char, queue,index_array= self.if_put_label(label, char, queue,0,index_array)
         print("samples get array {}--------".format(len(index_array)))
         self.memory_index.append(np.array(index_array[:taski_num]))
@@ -380,11 +437,12 @@ class BaseLearner(object):
         # choose this index & bag is True
         if label_v == len_value:
             index_array.append(index)
+            # index_array.append({string: label_v})
             # print(string)
             char.update(tmp_char)
         else:
-            queue[label_v].put(bag_value(label))
-            # queue[label_v].put(label)
+            # queue[label_v].put(bag_value(label))
+            queue[label_v].put(label)
         return char,queue,index_array
 
     def val(self, valid_loader, opt, best_score, start_time, iteration,

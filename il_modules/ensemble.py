@@ -10,7 +10,8 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 import torch.nn.init as init
 from il_modules.base import BaseLearner
-from modules.model import DERNet
+from il_modules.der import DER
+from modules.model import DERNet, Ensemble
 from test import validation
 from tools.utils import Averager, adjust_learning_rate
 
@@ -32,11 +33,11 @@ num_workers = 8
 T = 2
 
 
-class DER(BaseLearner):
+class Ensem(BaseLearner):
 
     def __init__(self, opt):
         super().__init__(opt)
-        self.model = DERNet(opt)
+        self.model = Ensemble(opt)
 
     def after_task(self):
         self.model = self.model.module
@@ -55,7 +56,6 @@ class DER(BaseLearner):
         # model.module.reset_class(opt, device)
         self.model.update_fc(self.opt.hidden_size, self._total_classes)
         self.model.build_prediction(self.opt, self._total_classes)
-        self.model.build_aux_prediction(self.opt, self._total_classes)
         # reset_class(self.model.module, self.device)
         # data parallel for multi-GPU
         self.model = torch.nn.DataParallel(self.model).to(self.device)
@@ -67,7 +67,6 @@ class DER(BaseLearner):
 
         self.model.update_fc(self.opt.hidden_size, self._total_classes)
         self.model.build_prediction(self.opt, self._total_classes)
-        self.model.build_aux_prediction(self.opt, self._total_classes)
 
         # weight initialization
         for name, param in self.model.named_parameters():
@@ -115,23 +114,33 @@ class DER(BaseLearner):
         """ start training """
         self._train(0, taski, train_loader, valid_loader)
 
+    def build_rehearsal_memory(self,train_loader,taski):
+        # Calculate the means of old classes with newly trained network
+        memory_num = self.opt.memory_num
+        num_i = int(memory_num / (taski))
+        self.build_random_current_memory(num_i, taski, train_loader)
+        if len(self.memory_index) != 0 and len(self.memory_index)*len(self.memory_index[0]) > memory_num:
+            self.reduce_samplers(taski,taski_num =num_i)
+        train_loader.get_dataset(taski,memory=self.opt.memory,index_list=self.memory_index)
+        print("Is using rehearsal memory, has {} prev datasets, each has {}\n".format(len(self.memory_index),self.memory_index[0].size))
+
 
     def _train(self, start_iter,taski, train_loader, valid_loader):
         if taski == 0:
-            self._init_train(start_iter,taski, train_loader, valid_loader)
+            self._init_train(start_iter,taski, train_loader, valid_loader,cross=True)
         else:
+            train_loader.get_dataset(taski, memory=None)
+            self.update_step1(start_iter,taski, train_loader, valid_loader)
             if self.opt.memory != None:
                 self.build_rehearsal_memory(train_loader, taski)
             else:
                 train_loader.get_dataset(taski, memory=self.opt.memory)
             self._update_representation(start_iter,taski, train_loader, valid_loader)
-            self.model.module.weight_align(self._total_classes - self._known_classes)
+            # self.model.module.weight_align(self._total_classes - self._known_classes)
 
-    def _init_train(self,start_iter,taski, train_loader, valid_loader):
+    def _init_train(self,start_iter,taski, train_loader, valid_loader,cross=False):
         # loss averager
         train_loss_avg = Averager()
-        train_clf_loss = None
-        train_aux_loss = None
         start_time = time.time()
         best_score = -1
 
@@ -152,7 +161,7 @@ class DER(BaseLearner):
 
             # default recognition loss part
             if "CTC" in self.opt.Prediction:
-                preds = self.model(image)['logits']
+                preds = self.model(image,cross)['logits']
                 # preds = self.model(image)
                 preds_size = torch.IntTensor([preds.size(1)] * batch_size)
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
@@ -183,16 +192,34 @@ class DER(BaseLearner):
                 # for validation log
                 # print("66666666")
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
-                    train_loss_avg, train_clf_loss, train_aux_loss, taski)
+                    train_loss_avg, taski)
                 train_loss_avg.reset()
+
+    def update_step1(self,start_iter,taski, train_loader, valid_loader):
+        self.model_eval_and_train(taski)
+        self._init_train(start_iter, taski, train_loader, valid_loader,cross=False)
+        self.model.train()
+        for p in self.model.module.model[-1].parameters():
+            p.requires_grad = False
+        self.model.module.model[-1].eval()
+
 
     def _update_representation(self,start_iter, taski, train_loader, valid_loader):
         # loss averager
         train_loss_avg = Averager()
-        train_clf_loss = Averager()
-        train_aux_loss = Averager()
+        #
+        # self.model_eval_and_train(taski)
+        # self._init_train(start_iter, taski, train_loader, valid_loader)
+        # filtered_parameters = self.count_param(self.model, False)
+        # self.criterion = self.build_criterion()
+        filtered_parameters = self.count_param(self.model)
 
-        self.model_eval_and_train(taski)
+        # setup optimizer
+        self.build_optimizer(filtered_parameters)
+
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                print(name)
 
 
         start_time = time.time()
@@ -200,8 +227,8 @@ class DER(BaseLearner):
 
         # training loop
         for iteration in tqdm(
-                range(start_iter + 1, self.opt.num_iter + 1),
-                total=self.opt.num_iter,
+                range(start_iter + 1, int(self.opt.num_iter//2) + 1),
+                total=int(self.opt.num_iter//2),
                 position=0,
                 leave=True,
         ):
@@ -215,21 +242,12 @@ class DER(BaseLearner):
 
             # default recognition loss part
             if "CTC" in self.opt.Prediction:
-                output = self.model(image)
+                output = self.model(image,True)
                 preds = output["logits"]
-                aux_logits = output["aux_logits"]
-                aux_targets = labels_index.clone()
-                aux_targets = torch.where(aux_targets - self._known_classes + 1 > 0,
-                                          aux_targets - self._known_classes + 1, 0)
-
-                aux_preds_size = torch.IntTensor([aux_logits.size(1)] * batch_size)
                 preds_size = torch.IntTensor([preds.size(1)] * batch_size)
                 # B，T，C(max) -> T, B, C
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
-                aux_preds_log_softmax = aux_logits.log_softmax(2).permute(1, 0, 2)
-
                 loss_clf = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
-                loss_aux = self.criterion(aux_preds_log_softmax, aux_targets, aux_preds_size, labels_length)
             else:
                 output = self.model(image, labels_index[:, :-1])  # align with Attention.forward
                 preds = output["logits"]
@@ -244,7 +262,7 @@ class DER(BaseLearner):
                 )
             # loss = loss_clf + loss_aux
             loss = loss_clf
-
+            loss.requires_grad_(True)
             self.model.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(
@@ -252,8 +270,6 @@ class DER(BaseLearner):
             )  # gradient clipping with 5 (Default)
             self.optimizer.step()
             train_loss_avg.add(loss)
-            train_clf_loss.add(loss_clf)
-            train_aux_loss.add(loss_aux)
 
             if "super" in self.opt.schedule:
                 self.scheduler.step()
@@ -265,64 +281,7 @@ class DER(BaseLearner):
             if iteration % self.opt.val_interval == 0 or iteration == 1:
                 # for validation log
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
-                    train_loss_avg, train_clf_loss, train_aux_loss, taski)
+                    train_loss_avg, taski)
                 train_loss_avg.reset()
-                train_clf_loss.reset()
-                train_aux_loss.reset()
 
-    def val(self, valid_loader, opt, best_score, start_time, iteration,
-            train_loss_avg,train_clf_loss, train_aux_loss, taski):
-        self.model.eval()
-        with torch.no_grad():
-            (
-                valid_loss,
-                current_score,
-                ned_score,
-                preds,
-                confidence_score,
-                labels,
-                infer_time,
-                length_of_data,
-            ) = validation(self.model, self.criterion, valid_loader, self.converter, opt)
-        self.model.train()
 
-        # keep best score (accuracy or norm ED) model on valid dataset
-        # Do not use this on test datasets. It would be an unfair comparison
-        # (training should be done without referring test set).
-        if current_score > best_score:
-            best_score = current_score
-            if opt.ch_list != None:
-                name = opt.ch_list[taski]
-            else:
-                name = opt.lan_list[taski]
-            torch.save(
-                self.model.state_dict(),
-                f"./saved_models/{opt.exp_name}/{name}_{taski}_best_score.pth",
-            )
-
-        # validation log: loss, lr, score (accuracy or norm ED), time.
-        lr = self.optimizer.param_groups[0]["lr"]
-        elapsed_time = time.time() - start_time
-        valid_log = f"\n[{iteration}/{opt.num_iter}] Train_loss: {train_loss_avg.val():0.5f}, Valid_loss: {valid_loss:0.5f} \n "
-        if train_clf_loss !=None:
-            valid_log += f"CLF_loss: {train_clf_loss.val():0.5f} , Aux_loss: {train_aux_loss.val():0.5f}\n"
-        valid_log += f'{"":9s}Current_score: {current_score:0.2f},   Ned_score: {ned_score:0.2f}\n'
-        valid_log += f'{"":9s}Current_lr: {lr:0.7f}, Best_score: {best_score:0.2f}\n'
-        valid_log += f'{"":9s}Infer_time: {infer_time:0.2f},     Elapsed_time: {elapsed_time:0.2f}\n'
-
-        # show some predicted results
-        dashed_line = "-" * 80
-        head = f'{"Ground Truth":25s} | {"Prediction":25s} | Confidence Score & T/F'
-        predicted_result_log = f"{dashed_line}\n{head}\n{dashed_line}\n"
-        for gt, pred, confidence in zip(
-                labels[:5], preds[:5], confidence_score[:5]
-        ):
-            if "Attn" in opt.Prediction:
-                gt = gt[: gt.find("[EOS]")]
-                pred = pred[: pred.find("[EOS]")]
-
-            predicted_result_log += f"{gt:25s} | {pred:25s} | {confidence:0.4f}\t{str(pred == gt)}\n"
-        predicted_result_log += f"{dashed_line}"
-        valid_log = f"{valid_log}\n{predicted_result_log}"
-        print(valid_log)
-        self.write_log(valid_log + "\n")

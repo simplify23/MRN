@@ -1,6 +1,6 @@
 common=dict(
-    exp_name="ch_base_CRNN",  # Where to store logs and models
-    il="base",  # base | lwf | wa | ewc
+    exp_name="ch_ewc_CRNN",  # Where to store logs and models
+    il="ewc",  # base | lwf | wa | ewc
     batch_max_length = 25,
     imgH = 32,
     imgW = 256,
