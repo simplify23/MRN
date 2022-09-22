@@ -3,6 +3,7 @@ import copy
 import torch
 import torch.nn as nn
 
+from modules.cbam import GatingMlpBlock
 from modules.transformation import TPS_SpatialTransformerNetwork
 from modules.feature_extraction import (
     VGG_FeatureExtractor,
@@ -235,7 +236,8 @@ class Model(nn.Module):
                 batch_max_length=self.opt.batch_max_length,
             )
 
-        return prediction  # [b, num_steps, opt.num_class]
+        # return prediction  # [b, num_steps, opt.num_class]
+        return {"predict":prediction,"feature":contextual_feature}
 
     def update_fc(self, hidden_size, nb_classes,device=None):
         fc = nn.Linear(hidden_size, nb_classes)
@@ -408,7 +410,7 @@ class Ensemble(nn.Module):
         """Transformation stage"""
         # features = [convnet(image) for convnet in self.model]
         if cross==False:
-            features = self.model[-1](image)
+            features = self.model[-1](image)["predict"]
         else:
             features = self.cross_forward(image)
         # out=self.fc(features) #{logics: self.fc(features)}
@@ -423,12 +425,16 @@ class Ensemble(nn.Module):
 
     def cross_forward(self, image, text=None, is_train=True, SelfSL_layer=False):
         """Transformation stage"""
-        features = [convnet(image) for convnet in self.model]
-
-        route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
+        features = [convnet(image)for convnet in self.model]
+        route_info = torch.cat([feature["feature"] for feature in features],-1)
+        route_info = self.gmlp(route_info)
+        route_info = self.channel_route(route_info).permute(0,2,1)
+        # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
         index = self.route(route_info.contiguous())
-        index = torch.max(index,-1)[1]
+        index = torch.max(torch.squeeze(index,-1),-1)[1]
+
         # feature_array = torch.stack(features, 1)
+        features = [feature["predict"] for feature in features]
         B,T,C = features[-1].size()
         list_len = len(features)
         normal_feat = []
@@ -452,7 +458,10 @@ class Ensemble(nn.Module):
 
         if self.out_dim is None:
             self.out_dim=self.model[-1].SequenceModeling_output
-        self.route = nn.Linear(self.patch * len(self.model), len(self.model))
+        # self.route = nn.Linear(self.patch * len(self.model), len(self.model))
+        self.route = nn.Linear(self.patch , 1)
+        self.channel_route = nn.Linear(self.feature_dim, len(self.model))
+        self.gmlp = GatingMlpBlock(self.feature_dim,self.feature_dim//len(self.model),self.patch)
         # [b, num_steps * len] -> [b, len]
         # if self.fc is not None:
         #     nb_output = self.fc.out_features

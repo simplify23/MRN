@@ -215,7 +215,7 @@ class Ensem(BaseLearner):
         filtered_parameters = self.count_param(self.model)
 
         # setup optimizer
-        self.build_optimizer(filtered_parameters)
+        self.build_optimizer(filtered_parameters,scale=1)
 
         for name, param in self.model.named_parameters():
             if param.requires_grad:
@@ -278,10 +278,12 @@ class Ensem(BaseLearner):
 
             # validation part.
             # To see training progress, we also conduct validation when 'iteration == 1'
-            if iteration % self.opt.val_interval == 0 or iteration == 1:
+            if iteration % (self.opt.val_interval//5) == 0 or iteration == 1:
                 # for validation log
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
                     train_loss_avg, taski)
                 train_loss_avg.reset()
+
+
 
 

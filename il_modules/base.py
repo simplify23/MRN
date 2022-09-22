@@ -82,20 +82,20 @@ class BaseLearner(object):
         self.model.train()
         # return model
 
-    def build_optimizer(self,filtered_parameters):
+    def build_optimizer(self,filtered_parameters,scale=1.0):
         if self.opt.optimizer == "sgd":
             optimizer = torch.optim.SGD(
                 filtered_parameters,
-                lr=self.opt.lr,
+                lr=self.opt.lr * scale,
                 momentum=self.opt.sgd_momentum,
                 weight_decay=self.opt.sgd_weight_decay,
             )
         elif self.opt.optimizer == "adadelta":
             optimizer = torch.optim.Adadelta(
-                filtered_parameters, lr=self.opt.lr, rho=self.opt.rho, eps=self.opt.eps
+                filtered_parameters, lr=self.opt.lr * scale, rho=self.opt.rho, eps=self.opt.eps
             )
         elif self.opt.optimizer == "adam":
-            optimizer = torch.optim.Adam(filtered_parameters, lr=self.opt.lr)
+            optimizer = torch.optim.Adam(filtered_parameters, lr=self.opt.lr * scale)
         # print("optimizer:")
         # print(optimizer)
         self.optimizer = optimizer
@@ -109,7 +109,7 @@ class BaseLearner(object):
 
             scheduler = torch.optim.lr_scheduler.OneCycleLR(
                 optimizer,
-                max_lr=self.opt.lr,
+                max_lr=self.opt.lr * scale,
                 cycle_momentum=cycle_momentum,
                 div_factor=20,
                 final_div_factor=1000,
