@@ -1,4 +1,3 @@
-import bisect
 import os
 
 import numpy as np
@@ -8,7 +7,7 @@ from torch.utils.data import Dataset, ConcatDataset, Subset
 from torch._utils import _accumulate
 import torchvision.transforms as transforms
 
-from data.dataset import concat_dataset, AlignCollate, LmdbDataset, AlignCollate2
+from data.dataset import concat_dataset, AlignCollate, LmdbDataset
 
 
 class Dataset_Manager(object):
@@ -28,7 +27,7 @@ class Dataset_Manager(object):
             index_current = numpy.random.choice(range(len(dataset)),int(2000/taski),replace=False)
             split_dataset = Subset(dataset,index_current.tolist())
             memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=2000,index_array=index_list)
-            self.create_dataloader_mix(IndexConcatDataset([memory_data,split_dataset]),self.opt.batch_size)
+            self.create_dataloader(ConcatDataset([memory_data,split_dataset]),self.opt.batch_size)
             print("taski is {} current dataset chose {}\n now dataset chose {}".format(taski,int(2000/taski),len(memory_data)))
         elif memory != None:
             memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=2000,index_array=index_list)
@@ -119,7 +118,7 @@ class Dataset_Manager(object):
         dataset_list = []
         for data_root in data_list:
             # dataset_log = f"dataset_root: {data_root}"
-            # print(dataset_log)
+            # # print(dataset_log)
             # dataset_log += "\n"
             dataset = LmdbDataset(data_root + "/" + self.opt.lan_list[taski], self.opt, mode=mode)
             dataset_log = f"num samples: {len(dataset)}"
@@ -149,43 +148,6 @@ class Dataset_Manager(object):
         self.data_loader_list.append(data_loader)
         self.dataloader_iter_list.append(iter(data_loader))
 
-    def create_dataloader_mix(self,dataset,batch_size=None):
-        data_loader = torch.utils.data.DataLoader(
-            dataset,
-            batch_size=self.opt.batch_size if batch_size==None else batch_size,
-            shuffle=True,
-            num_workers=int(self.opt.workers),
-            collate_fn=AlignCollate2(self.opt),
-            pin_memory=False,
-            drop_last=False,
-        )
-        self.data_loader_list.append(data_loader)
-        self.dataloader_iter_list.append(iter(data_loader))
-
-    def get_batch2(self):
-        balanced_batch_images = []
-        balanced_batch_labels = []
-        balanced_batch_index = []
-
-        for i, data_loader_iter in enumerate(self.dataloader_iter_list):
-            try:
-                image, label,index = data_loader_iter.next()
-                balanced_batch_images.append(image)
-                balanced_batch_labels += label
-                balanced_batch_index.append(index)
-            except StopIteration:
-                self.dataloader_iter_list[i] = iter(self.data_loader_list[i])
-                image, label = self.dataloader_iter_list[i].next()
-                balanced_batch_images.append(image)
-                balanced_batch_labels += label
-                balanced_batch_index.append(index)
-            except ValueError:
-                pass
-
-        balanced_batch_images = torch.cat(balanced_batch_images, 0)
-
-        return balanced_batch_images, balanced_batch_labels, balanced_batch_index
-
     def get_batch(self):
         balanced_batch_images = []
         balanced_batch_labels = []
@@ -206,19 +168,6 @@ class Dataset_Manager(object):
         balanced_batch_images = torch.cat(balanced_batch_images, 0)
 
         return balanced_batch_images, balanced_batch_labels
-
-class IndexConcatDataset(ConcatDataset):
-    def __getitem__(self, idx):
-        if idx < 0:
-            if -idx > len(self):
-                raise ValueError("absolute value of index should not exceed dataset length")
-            idx = len(self) + idx
-        dataset_idx = bisect.bisect_right(self.cumulative_sizes, idx)
-        if dataset_idx == 0:
-            sample_idx = idx
-        else:
-            sample_idx = idx - self.cumulative_sizes[dataset_idx - 1]
-        return self.datasets[dataset_idx][sample_idx],dataset_idx
 
 class DummyDataset(Dataset):
     def __init__(self, images, labels):
