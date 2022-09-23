@@ -100,6 +100,11 @@ class Ensem(BaseLearner):
             self.criterion = self.build_criterion()
             self.build_model()
 
+        # ignore [PAD] token
+        self.taski_criterion = torch.nn.CrossEntropyLoss(reduction="mean").to(
+            self.device
+        )
+
         if taski > 0:
             for i in range(taski):
                 for p in self.model.module.model[i].parameters():
@@ -204,9 +209,12 @@ class Ensem(BaseLearner):
         self.model.module.model[-1].eval()
 
 
-    def _update_representation(self,start_iter, taski, train_loader, valid_loader):
+    def _update_representation(self,start_iter, taski, train_loader, valid_loader,pi=1):
         # loss averager
         train_loss_avg = Averager()
+
+        # train_taski_loss_avg = Averager()
+        # loss_taski = nn.MSELoss()
         #
         # self.model_eval_and_train(taski)
         # self._init_train(start_iter, taski, train_loader, valid_loader)
@@ -215,7 +223,7 @@ class Ensem(BaseLearner):
         filtered_parameters = self.count_param(self.model)
 
         # setup optimizer
-        self.build_optimizer(filtered_parameters,scale=0.01)
+        self.build_optimizer(filtered_parameters,scale=1)
 
         for name, param in self.model.named_parameters():
             if param.requires_grad:
@@ -227,13 +235,13 @@ class Ensem(BaseLearner):
 
         # training loop
         for iteration in tqdm(
-                range(start_iter + 1, int(self.opt.num_iter//10) + 1),
-                total=int(self.opt.num_iter//10),
+                range(start_iter + 1, int(self.opt.num_iter//5) + 1),
+                total=int(self.opt.num_iter//5),
                 position=0,
                 leave=True,
         ):
-            image_tensors, labels = train_loader.get_batch()
-
+            image_tensors, labels, indexs = train_loader.get_batch2()
+            indexs = torch.LongTensor(indexs).squeeze().to(self.device)
             image = image_tensors.to(self.device)
             labels_index, labels_length = self.converter.encode(
                 labels, batch_max_length=self.opt.batch_max_length
@@ -242,8 +250,10 @@ class Ensem(BaseLearner):
 
             # default recognition loss part
             if "CTC" in self.opt.Prediction:
-                output = self.model(image,True)
+                output= self.model(image,True)
+                # [B,T,C,I], [B,I]
                 preds = output["logits"]
+                taski_loss = self.taski_criterion(output["index"],indexs)
                 preds_size = torch.IntTensor([preds.size(1)] * batch_size)
                 # B，T，C(max) -> T, B, C
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
@@ -261,8 +271,8 @@ class Ensem(BaseLearner):
                     aux_logits.view(-1, aux_logits.shape[-1]), aux_targets.contiguous().view(-1)
                 )
             # loss = loss_clf + loss_aux
-            loss = loss_clf
-            loss.requires_grad_(True)
+            loss = loss_clf + pi * taski_loss
+            # loss.requires_grad_(True)
             self.model.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(
@@ -278,7 +288,7 @@ class Ensem(BaseLearner):
 
             # validation part.
             # To see training progress, we also conduct validation when 'iteration == 1'
-            if iteration % (self.opt.val_interval//50) == 0 or iteration == 1:
+            if iteration % (self.opt.val_interval//10) == 0 or iteration == 1:
                 # for validation log
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
                     train_loss_avg, taski)
