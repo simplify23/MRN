@@ -411,10 +411,11 @@ class Ensemble(nn.Module):
         # features = [convnet(image) for convnet in self.model]
         if cross==False:
             features = self.model[-1](image)["predict"]
+            index = None
         else:
-            features = self.cross_forward(image)
+            features,index = self.cross_forward(image)
         # out=self.fc(features) #{logics: self.fc(features)}
-        out = dict({"logits":features,"features":None,"aux_logits":None})
+        out = dict({"logits":features,"index":index,"aux_logits":None})
 
         return out  # [b, num_steps, opt.num_class]
 
@@ -423,11 +424,30 @@ class Ensemble(nn.Module):
         zero = torch.ones([B,T,total-know],dtype=torch.float).to(feature.device)
         return torch.cat([feature,zero],dim=-1)
 
+    def max_forward(self, image, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        features = [convnet(image)for convnet in self.model]
+        route_info = torch.stack([torch.mean(torch.max(feature["predict"],-1)[0],-1) for feature in features],-1)
+        # route_info = self.gmlp(route_info)
+        indexs = torch.argmax(route_info, dim=-1)
+
+        features = [feature["predict"] for feature in features]
+        B,T,C = features[-1].size()
+        list_len = len(features)
+        normal_feat = []
+        for i in range(list_len-1):
+            feat = self.pad_zeros_features(features[i],total=C)
+            normal_feat.append(feat)
+        normal_feat.append(features[-1])
+        features = torch.stack(normal_feat,0)
+        output = torch.stack([features[index][i] for i,index in enumerate(indexs)],0)
+        return output.contiguous()
+
     def cross_forward(self, image, text=None, is_train=True, SelfSL_layer=False):
         """Transformation stage"""
         features = [convnet(image)for convnet in self.model]
         route_info = torch.cat([feature["feature"] for feature in features],-1)
-        route_info = self.gmlp(route_info)
+        # route_info = self.gmlp(route_info)
         route_info = self.channel_route(route_info).permute(0,2,1)
         # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
         index = self.route(route_info.contiguous())
@@ -449,7 +469,7 @@ class Ensemble(nn.Module):
         # out = dict({"logits":features[int(index)],"features":None,"aux_logits":None})
         #
         # return out  # [b, num_steps, opt.num_class]
-        return output.contiguous()
+        return output.contiguous(),index
 
     def update_fc(self, hidden_size, nb_classes,device=None):
         self.model.append(Model(self.opt))
@@ -461,7 +481,7 @@ class Ensemble(nn.Module):
         # self.route = nn.Linear(self.patch * len(self.model), len(self.model))
         self.route = nn.Linear(self.patch , 1)
         self.channel_route = nn.Linear(self.feature_dim, len(self.model))
-        self.gmlp = GatingMlpBlock(self.feature_dim,self.feature_dim//len(self.model),self.patch)
+        # self.gmlp = GatingMlpBlock(self.feature_dim,self.feature_dim//len(self.model),self.patch)
         # [b, num_steps * len] -> [b, len]
         # if self.fc is not None:
         #     nb_output = self.fc.out_features
@@ -473,6 +493,17 @@ class Ensemble(nn.Module):
         # del self.fc
         # self.fc = fc
         # fc = nn.Linear(self.feature_dim, nb_classes)
+    # def load_fc(self,input,output):
+    #     fc = nn.Linear(input,output)
+    #     if self.channel_route is not None:
+    #         nb_output = self.channel_route.out_features
+    #         weight = copy.deepcopy(self.channel_route.weight.data)
+    #         bias = copy.deepcopy(self.channel_route.bias.data)
+    #         fc.weight.data[:nb_output,:self.feature_dim-self.out_dim] = weight
+    #         fc.bias.data[:nb_output] = bias
+    #
+    #     del self.fc
+    #     self.fc = fc
     def build_prediction(self,opt,num_class):
         """Prediction"""
         if opt.Prediction == "CTC":

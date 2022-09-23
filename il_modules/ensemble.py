@@ -207,11 +207,13 @@ class Ensem(BaseLearner):
     def _update_representation(self,start_iter, taski, train_loader, valid_loader):
         # loss averager
         train_loss_avg = Averager()
+        train_taski_loss_avg = Averager()
+        loss_taski = nn.MSELoss()
         #
         # self.model_eval_and_train(taski)
         # self._init_train(start_iter, taski, train_loader, valid_loader)
         # filtered_parameters = self.count_param(self.model, False)
-        # self.criterion = self.build_criterion()
+        self.criterion = self.build_criterion()
         filtered_parameters = self.count_param(self.model)
 
         # setup optimizer
@@ -227,13 +229,13 @@ class Ensem(BaseLearner):
 
         # training loop
         for iteration in tqdm(
-                range(start_iter + 1, int(self.opt.num_iter//2) + 1),
-                total=int(self.opt.num_iter//2),
+                range(start_iter + 1, int(self.opt.num_iter//5) + 1),
+                total=int(self.opt.num_iter//5),
                 position=0,
                 leave=True,
         ):
-            image_tensors, labels = train_loader.get_batch()
-
+            image_tensors, labels, indexs = train_loader.get_batch2()
+            indexs = torch.FloatTensor(indexs).squeeze().to(self.device)
             image = image_tensors.to(self.device)
             labels_index, labels_length = self.converter.encode(
                 labels, batch_max_length=self.opt.batch_max_length
@@ -242,8 +244,9 @@ class Ensem(BaseLearner):
 
             # default recognition loss part
             if "CTC" in self.opt.Prediction:
-                output = self.model(image,True)
+                output= self.model(image,True)
                 preds = output["logits"]
+                mse_loss = loss_taski(output["index"],indexs)
                 preds_size = torch.IntTensor([preds.size(1)] * batch_size)
                 # B，T，C(max) -> T, B, C
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
@@ -261,7 +264,7 @@ class Ensem(BaseLearner):
                     aux_logits.view(-1, aux_logits.shape[-1]), aux_targets.contiguous().view(-1)
                 )
             # loss = loss_clf + loss_aux
-            loss = loss_clf
+            loss = loss_clf + mse_loss
             loss.requires_grad_(True)
             self.model.zero_grad()
             loss.backward()
@@ -278,7 +281,7 @@ class Ensem(BaseLearner):
 
             # validation part.
             # To see training progress, we also conduct validation when 'iteration == 1'
-            if iteration % (self.opt.val_interval//5) == 0 or iteration == 1:
+            if iteration % (self.opt.val_interval//10) == 0 or iteration == 1:
                 # for validation log
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
                     train_loss_avg, taski)
