@@ -9,6 +9,8 @@ from torch import optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 import torch.nn.init as init
+
+from data.dataset import hierarchical_dataset
 from il_modules.base import BaseLearner
 from il_modules.der import DER
 from modules.model import DERNet, Ensemble
@@ -40,7 +42,9 @@ class Ensem(BaseLearner):
         self.model = Ensemble(opt)
 
     def after_task(self):
-        self.model = self.model.module
+        # will we need this line ? (AB Study)
+        # self.model = self.model.module
+
         self._known_classes = self._total_classes
         # logging.info('Exemplar size: {}'.format(self.exemplar_size))
 
@@ -200,7 +204,7 @@ class Ensem(BaseLearner):
                 # for validation log
                 # print("66666666")
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
-                    train_loss_avg, taski)
+                    train_loss_avg, taski,"FF")
                 train_loss_avg.reset()
 
     def update_step1(self,start_iter,taski, train_loader, valid_loader):
@@ -238,8 +242,8 @@ class Ensem(BaseLearner):
 
         # training loop
         for iteration in tqdm(
-                range(start_iter + 1, int(self.opt.num_iter//5) + 1),
-                total=int(self.opt.num_iter//5),
+                range(start_iter + 1, int(self.opt.num_iter//2) + 1),
+                total=int(self.opt.num_iter//2),
                 position=0,
                 leave=True,
         ):
@@ -291,11 +295,129 @@ class Ensem(BaseLearner):
 
             # validation part.
             # To see training progress, we also conduct validation when 'iteration == 1'
-            if iteration % (self.opt.val_interval//10)== 0 or iteration == 1:
+            if iteration % (self.opt.val_interval//5)== 0 or iteration == 1:
                 # for validation log
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
-                    train_loss_avg, taski)
+                    train_loss_avg, taski,"TF")
                 train_loss_avg.reset()
+
+    def val(self, valid_loader, opt, best_score, start_time, iteration,
+            train_loss_avg, taski, val_choose="val"):
+        self.model.eval()
+        with torch.no_grad():
+            (
+                valid_loss,
+                current_score,
+                ned_score,
+                preds,
+                confidence_score,
+                labels,
+                infer_time,
+                length_of_data,
+            ) = validation(self.model, self.criterion, valid_loader, self.converter, opt,val_choose=val_choose)
+        self.model.train()
+
+        # keep best score (accuracy or norm ED) model on valid dataset
+        # Do not use this on test datasets. It would be an unfair comparison
+        # (training should be done without referring test set).
+        if current_score > best_score:
+            best_score = current_score
+            if opt.ch_list != None:
+                name = opt.ch_list[taski]
+            else:
+                name = opt.lan_list[taski]
+            torch.save(
+                self.model.state_dict(),
+                f"./saved_models/{opt.exp_name}/{name}_{taski}_best_score.pth",
+            )
+
+        # validation log: loss, lr, score (accuracy or norm ED), time.
+        lr = self.optimizer.param_groups[0]["lr"]
+        elapsed_time = time.time() - start_time
+        valid_log = f"\n[{iteration}/{opt.num_iter}] Train_loss: {train_loss_avg.val():0.5f}, Valid_loss: {valid_loss:0.5f} \n "
+        # valid_log += f", Semi_loss: {semi_loss_avg.val():0.5f}\n"
+        valid_log += f'{"":9s}Current_score: {current_score:0.2f},   Ned_score: {ned_score:0.2f}\n'
+        valid_log += f'{"":9s}Current_lr: {lr:0.7f}, Best_score: {best_score:0.2f}\n'
+        valid_log += f'{"":9s}Infer_time: {infer_time:0.2f},     Elapsed_time: {elapsed_time:0.2f}\n'
+
+        # show some predicted results
+        dashed_line = "-" * 80
+        head = f'{"Ground Truth":25s} | {"Prediction":25s} | Confidence Score & T/F'
+        predicted_result_log = f"{dashed_line}\n{head}\n{dashed_line}\n"
+        for gt, pred, confidence in zip(
+                labels[:5], preds[:5], confidence_score[:5]
+        ):
+            if "Attn" in opt.Prediction:
+                gt = gt[: gt.find("[EOS]")]
+                pred = pred[: pred.find("[EOS]")]
+
+            predicted_result_log += f"{gt:25s} | {pred:25s} | {confidence:0.4f}\t{str(pred == gt)}\n"
+        predicted_result_log += f"{dashed_line}"
+        valid_log = f"{valid_log}\n{predicted_result_log}"
+        print(valid_log)
+        self.write_log(valid_log + "\n")
+        # self.write_data_log(
+        #     f"Task {opt.lan_list[taski]} [{iteration}/{opt.num_iter}] : Score:{current_score:0.2f} LR:{lr:0.7f}\n")
+
+
+    def test(self, AlignCollate_valid,valid_datas,best_scores,ned_scores,taski,val_choose="test"):
+        print("---Start evaluation on benchmark testset----")
+        if taski == 0:
+            val_choose = "FF"
+        else:
+            val_choose = "TF"
+        """ keep evaluation model and result logs """
+        os.makedirs(f"./result/{self.opt.exp_name}", exist_ok=True)
+        os.makedirs(f"./evaluation_log", exist_ok=True)
+        if self.opt.ch_list != None:
+            name = self.opt.ch_list[taski]
+        else:
+            name = self.opt.lan_list[taski]
+        saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_best_score.pth"
+        # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
+        self.model.load_state_dict(torch.load(f"{saved_best_model}"))
+
+        task_accs = []
+        ned_accs = []
+        for val_data in valid_datas:
+            valid_dataset, valid_dataset_log = hierarchical_dataset(
+                root=val_data, opt=self.opt, mode="test")
+            valid_loader = torch.utils.data.DataLoader(
+                valid_dataset,
+                batch_size=self.opt.batch_size,
+                shuffle=True,  # 'True' to check training progress with validation function.
+                num_workers=int(self.opt.workers),
+                collate_fn=AlignCollate_valid,
+                pin_memory=False,
+            )
+
+            self.model.eval()
+            with torch.no_grad():
+                (
+                    valid_loss,
+                    current_score,
+                    ned_score,
+                    preds,
+                    confidence_score,
+                    labels,
+                    infer_time,
+                    length_of_data,
+                ) = validation(self.model, self.criterion, valid_loader, self.converter, self.opt,val_choose=val_choose)
+
+
+            task_accs.append(round(current_score,2))
+            ned_accs.append(round(ned_score,2))
+
+
+        best_scores.append(round(sum(task_accs) / len(task_accs),2))
+        ned_scores.append(round(sum(ned_accs) / len(ned_accs),2))
+
+        acc_log= f'Task {taski} Test Average Incremental Accuracy: {best_scores[taski]} \n Task {taski} Incremental Accuracy: {task_accs}\n ned_acc: {ned_accs}\n'
+        self.write_data_log(f'{taski} Avg Acc: {best_scores[taski]:0.2f} \n  acc: {task_accs}\n')
+
+        print(acc_log)
+        self.write_log(acc_log)
+        return best_scores,ned_scores
 
 
 

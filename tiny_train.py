@@ -251,7 +251,8 @@ def train(opt, log):
     # valid_datasets = ["mlt_2017_val_Latin", "mlt_2017_val_Chinese", "mlt_2017_val_Arabic", "mlt_2017_val_Japanese", "mlt_2017_val_Korean", "mlt_2017_val_Bangla", "mlt_2017_val_Symbols"]
     # train_datasets = [opt.root_pefix + "_train_" + lan for lan in opt.lan_list]
     # valid_datasets = [opt.root_pefix + "_test_" + lan for lan in opt.lan_list]
-    write_data_log(f"---- {opt.exp_name} ----\n")
+    write_data_log(f"----------- {opt.exp_name} ------------\n")
+    print(f"----------- {opt.exp_name} ------------\n")
 
     if opt.ch_list!=None:
         train_datasets = [ch+"/train" for ch in opt.ch_list]

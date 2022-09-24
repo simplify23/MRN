@@ -515,7 +515,12 @@ class Ensemble(nn.Module):
         # self.route = nn.Linear(self.patch * len(self.model), len(self.model))
         self.route = nn.Linear(self.patch , 1)
         self.channel_route = nn.Linear(self.feature_dim, len(self.model))
-        self.gmlp = GatingMlpBlock(self.feature_dim,self.feature_dim//len(self.model),self.patch)
+        # self.gmlp = GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
+        self.gmlp = nn.Sequential(
+            GatingMlpBlock(self.feature_dim,self.feature_dim//len(self.model),self.patch),
+            GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
+            GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
+        )
         # [b, num_steps * len] -> [b, len]
         # if self.fc is not None:
         #     nb_output = self.fc.out_features
