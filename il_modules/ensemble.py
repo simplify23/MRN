@@ -132,15 +132,18 @@ class Ensem(BaseLearner):
 
     def _train(self, start_iter,taski, train_loader, valid_loader):
         if taski == 0:
-            self._init_train(start_iter,taski, train_loader, valid_loader,cross=False)
+            # valid_loader = valid_loader.create_dataset()
+            self._init_train(start_iter,taski, train_loader, valid_loader.create_dataset(),cross=False)
         else:
             train_loader.get_dataset(taski, memory=None)
-            self.update_step1(start_iter,taski, train_loader, valid_loader)
+            # valid_loader = valid_loader.create_dataset()
+
+            self.update_step1(start_iter,taski, train_loader, valid_loader.create_dataset())
             if self.opt.memory != None:
                 self.build_rehearsal_memory(train_loader, taski)
             else:
                 train_loader.get_dataset(taski, memory=self.opt.memory)
-            self._update_representation(start_iter,taski, train_loader, valid_loader)
+            self._update_representation(start_iter,taski, train_loader, valid_loader.create_list_dataset())
             # self.model.module.weight_align(self._total_classes - self._known_classes)
 
     def _init_train(self,start_iter,taski, train_loader, valid_loader,cross=False):

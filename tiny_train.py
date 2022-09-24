@@ -5,7 +5,7 @@ import random
 import argparse
 
 import il_modules
-from data.data_manage import Dataset_Manager
+from data.data_manage import Dataset_Manager, Val_Dataset
 from il_modules.base import BaseLearner
 from il_modules.der import DER
 from il_modules.ensemble import Ensem
@@ -294,6 +294,7 @@ def train(opt, log):
         valid_data = os.path.join(opt.valid_data, valid_datasets[taski])
         valid_datas.append(valid_data)
 
+        valid_loader = Val_Dataset(valid_datas,opt)
         tmp_char = dict()
         """dataset preparation"""
         select_data = opt.select_data
@@ -320,20 +321,20 @@ def train(opt, log):
                 opt.character,tmp_char = load_dict(data_path+f"/{opt.lan_list[taski]}",char,tmp_char)
         # char_score = count_char_score(tmp_char)
         AlignCollate_valid = AlignCollate(opt, mode="test")
-        valid_dataset, valid_dataset_log = hierarchical_dataset(
-            root=valid_data, opt=opt, mode="test"
-        )
-        valid_loader = torch.utils.data.DataLoader(
-            valid_dataset,
-            batch_size=opt.batch_size,
-            shuffle=True,  # 'True' to check training progress with validation function.
-            num_workers=int(opt.workers),
-            collate_fn=AlignCollate_valid,
-            pin_memory=False,
-        )
-        log.write(valid_dataset_log)
-        print("-" * 80)
-        log.write("-" * 80 + "\n")
+        # valid_dataset, valid_dataset_log = hierarchical_dataset(
+        #     root=valid_data, opt=opt, mode="test"
+        # )
+        # valid_loader = torch.utils.data.DataLoader(
+        #     valid_dataset,
+        #     batch_size=opt.batch_size,
+        #     shuffle=True,  # 'True' to check training progress with validation function.
+        #     num_workers=int(opt.workers),
+        #     collate_fn=AlignCollate_valid,
+        #     pin_memory=False,
+        # )
+        # log.write(valid_dataset_log)
+        # print("-" * 80)
+        # log.write("-" * 80 + "\n")
         # log.close()
 
         # ----- incremental model start -------

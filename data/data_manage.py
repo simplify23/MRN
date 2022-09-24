@@ -12,7 +12,7 @@ from data.dataset import concat_dataset, AlignCollate, LmdbDataset, AlignCollate
 
 
 class Dataset_Manager(object):
-    def __int__(self):
+    def __init__(self):
         # self.data_list = []
         self.data_loader_list = []
         self.dataloader_iter_list = []
@@ -208,38 +208,50 @@ class Dataset_Manager(object):
         return balanced_batch_images, balanced_batch_labels
 
 class Val_Dataset(object):
-    def __int__(self):
+    def __init__(self,val_datas,opt):
         self.data_loader_list = []
         self.dataset_list = []
-        self.select_data = None
-    def create_dataset(self,val_data, opt,):
-        AlignCollate_valid = AlignCollate(opt, mode="test")
+        self.current_data = val_datas[-1]
+        self.val_datas = val_datas
+        self.opt = opt
+        self.AlignCollate_valid = AlignCollate(self.opt, mode="test")
+
+
+    def create_dataset(self,val_data=None):
+        if val_data == None:
+            val_data = self.current_data
         valid_dataset, valid_dataset_log = hierarchical_dataset(
-            root=val_data, opt=opt, mode="test"
+            root=val_data, opt=self.opt, mode="test"
         )
+        print(valid_dataset_log)
+        print("-" * 80)
         valid_loader = torch.utils.data.DataLoader(
             valid_dataset,
-            batch_size=opt.batch_size,
+            batch_size=self.opt.batch_size,
             shuffle=True,  # 'True' to check training progress with validation function.
-            num_workers=int(opt.workers),
-            collate_fn=AlignCollate_valid,
+            num_workers=int(self.opt.workers),
+            collate_fn=self.AlignCollate_valid,
             pin_memory=False,
         )
         return valid_loader
-    def create_list_dataset(self,valid_datas,opt):
-        AlignCollate_valid = AlignCollate(opt, mode="test")
+
+    def create_list_dataset(self,valid_datas=None):
+        if valid_datas==None:
+            valid_datas = self.val_datas
         concat_data = []
         for val_data in valid_datas:
             valid_dataset, valid_dataset_log = hierarchical_dataset(
-                root=val_data, opt=opt, mode="test")
+                root=val_data, opt=self.opt, mode="test")
             concat_data.append(valid_dataset)
+            print(valid_dataset_log)
+            print("-" * 80)
         val_data = ConcatDataset(concat_data)
         valid_loader = torch.utils.data.DataLoader(
             val_data,
-            batch_size=opt.batch_size,
+            batch_size=self.opt.batch_size,
             shuffle=True,  # 'True' to check training progress with validation function.
-            num_workers=int(opt.workers),
-            collate_fn=AlignCollate_valid,
+            num_workers=int(self.opt.workers),
+            collate_fn=self.AlignCollate_valid,
             pin_memory=False,
         )
         return valid_loader

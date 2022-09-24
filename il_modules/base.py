@@ -165,6 +165,7 @@ class BaseLearner(object):
         # self._known_classes = self._total_classes
         self.character = character
         self.converter = self.build_converter()
+        valid_loader = valid_loader.create_dataset()
 
         if taski > 0:
             self.change_model()
