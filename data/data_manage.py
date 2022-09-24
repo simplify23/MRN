@@ -25,10 +25,10 @@ class Dataset_Manager(object):
         dataset = self.create_dataset(data_list=self.select_data,taski=taski)
 
         if memory == "test":
-            index_current = numpy.random.choice(range(len(dataset)),int(2000/taski),replace=False)
-            split_dataset = Subset(dataset,index_current.tolist())
+            # index_current = numpy.random.choice(range(len(dataset)),int(2000/taski),replace=False)
+            # split_dataset = Subset(dataset,index_current.tolist())
             memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=2000,index_array=index_list)
-            self.create_dataloader_mix(IndexConcatDataset([memory_data,split_dataset]),self.opt.batch_size)
+            self.create_dataloader_mix(IndexConcatDataset([memory_data,dataset]),self.opt.batch_size)
             print("taski is {} current dataset chose {}\n now dataset chose {}".format(taski,int(2000/taski),len(memory_data)))
         elif memory != None:
             memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=2000,index_array=index_list)

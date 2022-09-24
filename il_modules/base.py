@@ -396,16 +396,16 @@ class BaseLearner(object):
             data_len[labels_length].append({labels:index})
             if labels_length > max_length:
                 max_length = labels_length
-        queue = [Queue() for i in range(max_length)]
-        # queue = [PriorityQueue() for i in range(max_length)]
+        # queue = [Queue() for i in range(max_length)]
+        queue = [PriorityQueue() for i in range(max_length)]
         for i in range(max_length):
             # max-(0:max-1)  -> max : 1
             len_label = max_length - i
             # print("starting {}--------".format(len_label))
             if i!=0:
                 for j in range(queue[len_label].qsize()):
-                    # label = queue[len_label].get().bag
-                    label = queue[len_label].get()
+                    label = queue[len_label].get().bag
+                    # label = queue[len_label].get()
                     char,queue,index_array = self.if_put_label(label,char, queue,len_label,index_array)
 
             if data_len[len_label] == []:
@@ -419,8 +419,8 @@ class BaseLearner(object):
         for j in range(queue[0].qsize()):
             if len(index_array) > taski_num:
                 break
-            label = queue[0].get()
-            # label = queue[0].get().bag
+            # label = queue[0].get()
+            label = queue[0].get().bag
             char, queue,index_array= self.if_put_label(label, char, queue,0,index_array)
         print("samples get array {}--------".format(len(index_array)))
         self.memory_index.append(np.array(index_array[:taski_num]))
@@ -439,11 +439,10 @@ class BaseLearner(object):
         if label_v == len_value:
             index_array.append(index)
             # index_array.append({string: label_v})
-            # print(string)
             char.update(tmp_char)
         else:
-            # queue[label_v].put(bag_value(label))
-            queue[label_v].put(label)
+            queue[label_v].put(bag_value(label))
+            # queue[label_v].put(label)
         return char,queue,index_array
 
     def val(self, valid_loader, opt, best_score, start_time, iteration,

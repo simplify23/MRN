@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 import os
 
@@ -10,6 +11,7 @@ from torch import optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 import torch.nn.init as init
+from torch.autograd import Variable
 
 from data.dataset import hierarchical_dataset
 from il_modules.base import BaseLearner
@@ -44,7 +46,7 @@ class Ensem(BaseLearner):
 
     def after_task(self):
         # will we need this line ? (AB Study)
-        # self.model = self.model.module
+        self.model = self.model.module
 
         self._known_classes = self._total_classes
         # logging.info('Exemplar size: {}'.format(self.exemplar_size))
@@ -108,9 +110,10 @@ class Ensem(BaseLearner):
             self.build_model()
 
         # ignore [PAD] token
-        self.taski_criterion = torch.nn.CrossEntropyLoss(reduction="mean").to(
-            self.device
-        )
+        # self.taski_criterion = torch.nn.CrossEntropyLoss(reduction="mean").to(
+        #     self.device
+        # )
+        self.taski_criterion = FocalLoss().to(self.device)
 
         if taski > 0:
             for i in range(taski):
@@ -159,7 +162,8 @@ class Ensem(BaseLearner):
         # Calculate the means of old classes with newly trained network
         memory_num = self.opt.memory_num
         num_i = int(memory_num / (taski))
-        self.build_random_current_memory(num_i, taski, train_loader)
+        self.build_queue_bag_memory(num_i, taski, train_loader)
+        # self.build_random_current_memory(num_i, taski, train_loader)
         if len(self.memory_index) != 0 and len(self.memory_index)*len(self.memory_index[0]) > memory_num:
             self.reduce_samplers(taski,taski_num =num_i)
         train_loader.get_dataset(taski,memory=self.opt.memory,index_list=self.memory_index)
@@ -264,9 +268,9 @@ class Ensem(BaseLearner):
         # setup optimizer
         self.build_optimizer(filtered_parameters,scale=1)
 
-        for name, param in self.model.named_parameters():
-            if param.requires_grad:
-                print(name)
+        # for name, param in self.model.named_parameters():
+        #     if param.requires_grad:
+        #         print(name)
 
 
         start_time = time.time()
@@ -452,5 +456,35 @@ class Ensem(BaseLearner):
         return best_scores,ned_scores
 
 
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=0, alpha=None, size_average=True):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        if isinstance(alpha,(float,int)): self.alpha = torch.Tensor([alpha,1-alpha])
+        if isinstance(alpha,list): self.alpha = torch.Tensor(alpha)
+        self.size_average = size_average
+
+    def forward(self, input, target):
+        if input.dim()>2:
+            input = input.view(input.size(0),input.size(1),-1)  # N,C,H,W => N,C,H*W
+            input = input.transpose(1,2)    # N,C,H*W => N,H*W,C
+            input = input.contiguous().view(-1,input.size(2))   # N,H*W,C => N*H*W,C
+        target = target.view(-1,1)
+
+        logpt = F.log_softmax(input)
+        logpt = logpt.gather(1,target)
+        logpt = logpt.view(-1)
+        pt = Variable(logpt.data.exp())
+
+        if self.alpha is not None:
+            if self.alpha.type()!=input.data.type():
+                self.alpha = self.alpha.type_as(input.data)
+            at = self.alpha.gather(0,target.data.view(-1))
+            logpt = logpt * Variable(at)
+
+        loss = -1 * (1-pt)**self.gamma * logpt
+        if self.size_average: return loss.mean()
+        else: return loss.sum()
 
 
