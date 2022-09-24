@@ -412,6 +412,8 @@ class Ensemble(nn.Module):
         if cross==False:
             features = self.model[-1](image)["predict"]
             index = None
+        elif is_train == False:
+            features, index = self.cross_test(image)
         else:
             features,index = self.cross_forwardv2(image)
         # out=self.fc(features) #{logics: self.fc(features)}
@@ -443,11 +445,14 @@ class Ensemble(nn.Module):
         output = torch.stack([features[index][i] for i,index in enumerate(indexs)],0)
         return output.contiguous()
 
+    def cross_test(self, image, text=None, is_train=False, SelfSL_layer=False):
+        return self.cross_forward(image, text=None, is_train=False, SelfSL_layer=False)
+
     def cross_forwardv2(self, image, text=None, is_train=True, SelfSL_layer=False):
         """Transformation stage"""
         features = [convnet(image)for convnet in self.model]
         route_info = torch.cat([feature["feature"] for feature in features],-1)
-        # route_info = self.gmlp(route_info)
+        route_info = self.gmlp(route_info)
         route_info = self.channel_route(route_info).permute(0,2,1)
         # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
         index = self.route(route_info.contiguous())
@@ -475,7 +480,7 @@ class Ensemble(nn.Module):
         """Transformation stage"""
         features = [convnet(image)for convnet in self.model]
         route_info = torch.cat([feature["feature"] for feature in features],-1)
-        # route_info = self.gmlp(route_info)
+        route_info = self.gmlp(route_info)
         route_info = self.channel_route(route_info).permute(0,2,1)
         # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
         index = self.route(route_info.contiguous())
@@ -510,7 +515,7 @@ class Ensemble(nn.Module):
         # self.route = nn.Linear(self.patch * len(self.model), len(self.model))
         self.route = nn.Linear(self.patch , 1)
         self.channel_route = nn.Linear(self.feature_dim, len(self.model))
-        # self.gmlp = GatingMlpBlock(self.feature_dim,self.feature_dim//len(self.model),self.patch)
+        self.gmlp = GatingMlpBlock(self.feature_dim,self.feature_dim//len(self.model),self.patch)
         # [b, num_steps * len] -> [b, len]
         # if self.fc is not None:
         #     nb_output = self.fc.out_features

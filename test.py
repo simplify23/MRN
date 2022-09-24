@@ -136,7 +136,7 @@ def benchmark_all_eval(model, criterion, converter, opt, calculate_infer_time=Fa
     return total_accuracy, eval_data_list, accuracy_list
 
 
-def validation(model, criterion, eval_loader, converter, opt, tqdm_position=1):
+def validation(model, criterion, eval_loader, converter, opt, val_choose="val",tqdm_position=1):
     """validation or evaluation"""
     n_correct = 0
     norm_ED = 0
@@ -160,7 +160,10 @@ def validation(model, criterion, eval_loader, converter, opt, tqdm_position=1):
 
         if "CTC" in opt.Prediction:
             start_time = time.time()
-            preds = model(image)
+            if val_choose == "val":
+                preds = model(image, cross = False, is_train=False)
+            else:
+                preds = model(image,is_train=False)
             if len(preds)==3:
                 preds = preds['logits']
             forward_time = time.time() - start_time

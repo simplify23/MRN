@@ -8,7 +8,7 @@ from torch.utils.data import Dataset, ConcatDataset, Subset
 from torch._utils import _accumulate
 import torchvision.transforms as transforms
 
-from data.dataset import concat_dataset, AlignCollate, LmdbDataset, AlignCollate2
+from data.dataset import concat_dataset, AlignCollate, LmdbDataset, AlignCollate2, hierarchical_dataset
 
 
 class Dataset_Manager(object):
@@ -206,6 +206,44 @@ class Dataset_Manager(object):
         balanced_batch_images = torch.cat(balanced_batch_images, 0)
 
         return balanced_batch_images, balanced_batch_labels
+
+class Val_Dataset(object):
+    def __int__(self):
+        self.data_loader_list = []
+        self.dataset_list = []
+        self.select_data = None
+    def create_dataset(self,val_data, opt,):
+        AlignCollate_valid = AlignCollate(opt, mode="test")
+        valid_dataset, valid_dataset_log = hierarchical_dataset(
+            root=val_data, opt=opt, mode="test"
+        )
+        valid_loader = torch.utils.data.DataLoader(
+            valid_dataset,
+            batch_size=opt.batch_size,
+            shuffle=True,  # 'True' to check training progress with validation function.
+            num_workers=int(opt.workers),
+            collate_fn=AlignCollate_valid,
+            pin_memory=False,
+        )
+        return valid_loader
+    def create_list_dataset(self,valid_datas,opt):
+        AlignCollate_valid = AlignCollate(opt, mode="test")
+        concat_data = []
+        for val_data in valid_datas:
+            valid_dataset, valid_dataset_log = hierarchical_dataset(
+                root=val_data, opt=opt, mode="test")
+            concat_data.append(valid_dataset)
+        val_data = ConcatDataset(concat_data)
+        valid_loader = torch.utils.data.DataLoader(
+            val_data,
+            batch_size=opt.batch_size,
+            shuffle=True,  # 'True' to check training progress with validation function.
+            num_workers=int(opt.workers),
+            collate_fn=AlignCollate_valid,
+            pin_memory=False,
+        )
+        return valid_loader
+
 
 class IndexConcatDataset(ConcatDataset):
     def __getitem__(self, idx):

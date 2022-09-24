@@ -132,7 +132,7 @@ class Ensem(BaseLearner):
 
     def _train(self, start_iter,taski, train_loader, valid_loader):
         if taski == 0:
-            self._init_train(start_iter,taski, train_loader, valid_loader,cross=True)
+            self._init_train(start_iter,taski, train_loader, valid_loader,cross=False)
         else:
             train_loader.get_dataset(taski, memory=None)
             self.update_step1(start_iter,taski, train_loader, valid_loader)
@@ -288,7 +288,7 @@ class Ensem(BaseLearner):
 
             # validation part.
             # To see training progress, we also conduct validation when 'iteration == 1'
-            if iteration % (self.opt.val_interval//10) == 0 or iteration == 1:
+            if iteration % (self.opt.val_interval//10)== 0 or iteration == 1:
                 # for validation log
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
                     train_loss_avg, taski)

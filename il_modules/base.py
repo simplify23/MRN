@@ -458,7 +458,7 @@ class BaseLearner(object):
                 labels,
                 infer_time,
                 length_of_data,
-            ) = validation(self.model, self.criterion, valid_loader, self.converter, opt)
+            ) = validation(self.model, self.criterion, valid_loader, self.converter, opt,val_choose="val")
         self.model.train()
 
         # keep best score (accuracy or norm ED) model on valid dataset
@@ -542,7 +542,7 @@ class BaseLearner(object):
                     labels,
                     infer_time,
                     length_of_data,
-                ) = validation(self.model, self.criterion, valid_loader, self.converter, self.opt)
+                ) = validation(self.model, self.criterion, valid_loader, self.converter, self.opt,val_choose="test")
 
 
             task_accs.append(round(current_score,2))
