@@ -1,5 +1,6 @@
 import logging
 import time
+import os
 
 import numpy as np
 from tqdm import tqdm
@@ -58,6 +59,8 @@ class Ensem(BaseLearner):
     def change_model(self,):
         """ model configuration """
         # model.module.reset_class(opt, device)
+        if isinstance(self.model, torch.nn.DataParallel):
+            self.model = self.model.module
         self.model.update_fc(self.opt.hidden_size, self._total_classes)
         self.model.build_prediction(self.opt, self._total_classes)
         # reset_class(self.model.module, self.device)
