@@ -1,5 +1,5 @@
 common=dict(
-    exp_name="CRNN_ems_random_4_focal_loss_bag",  # Where to store logs and models
+    exp_name="CRNN_ems_random_4_bag",  # Where to store logs and models
     il="ems",  # base | lwf | wa | ewc ｜ der
     memory="test", # None | rehearsal | random | bag | score | loss_max
     memory_num=2000,

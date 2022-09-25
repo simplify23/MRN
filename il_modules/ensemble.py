@@ -110,10 +110,10 @@ class Ensem(BaseLearner):
             self.build_model()
 
         # ignore [PAD] token
-        # self.taski_criterion = torch.nn.CrossEntropyLoss(reduction="mean").to(
-        #     self.device
-        # )
-        self.taski_criterion = FocalLoss().to(self.device)
+        self.taski_criterion = torch.nn.CrossEntropyLoss(reduction="mean").to(
+            self.device
+        )
+        # self.taski_criterion = FocalLoss().to(self.device)
 
         if taski > 0:
             for i in range(taski):
