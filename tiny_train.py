@@ -340,7 +340,7 @@ def train(opt, log):
 
         # ----- incremental model start -------
 
-        learner.incremental_train(taski, opt.character, train_loader, valid_loader)
+        learner.incremental_train(taski, opt.character, train_loader, valid_loader, opt)
 
         # ----- incremental model end -------
         """ Evaluation at the end of training """
