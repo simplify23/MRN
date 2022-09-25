@@ -456,10 +456,10 @@ class Ensemble(nn.Module):
         route_info = self.channel_route(route_info).permute(0,2,1)
         # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
         index = self.route(route_info.contiguous())
+        index = self.db_function(torch.squeeze(index,-1))
         # index [B,I]
         # index = torch.max(torch.squeeze(index,-1),-1)[1]
         # index = torch.mean(torch.squeeze(index, -1), -1)
-        index = torch.squeeze(index,-1)
 
         # feature_array = torch.stack(features, 1)
         features = [feature["predict"] for feature in features]
@@ -484,7 +484,8 @@ class Ensemble(nn.Module):
         route_info = self.channel_route(route_info).permute(0,2,1)
         # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
         index = self.route(route_info.contiguous())
-        index = torch.max(torch.squeeze(index,-1),-1)[1]
+        index = self.db_function(torch.squeeze(index, -1))
+        index = torch.max(index,-1)[1]
         # index = torch.mean(torch.squeeze(index, -1), -1)
 
         # feature_array = torch.stack(features, 1)
@@ -560,6 +561,9 @@ class Ensemble(nn.Module):
 
     def copy(self):
         return copy.deepcopy(self)
+
+    def db_function(self, x, k = 50):
+        return torch.reciprocal(1 + torch.exp(-k * x))
 
     # def freeze(self):
     #     for param in self.parameters():

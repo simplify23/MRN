@@ -129,7 +129,6 @@ class Ensem(BaseLearner):
         if opt.start_task > taski:
 
             if taski > 0:
-
                 train_loader.get_dataset(taski, memory=None)
                 # valid_loader = valid_loader.create_dataset()
 
@@ -162,8 +161,8 @@ class Ensem(BaseLearner):
         # Calculate the means of old classes with newly trained network
         memory_num = self.opt.memory_num
         num_i = int(memory_num / (taski))
-        self.build_queue_bag_memory(num_i, taski, train_loader)
-        # self.build_random_current_memory(num_i, taski, train_loader)
+        # self.build_queue_bag_memory(num_i, taski, train_loader)
+        self.build_random_current_memory(num_i, taski, train_loader)
         if len(self.memory_index) != 0 and len(self.memory_index)*len(self.memory_index[0]) > memory_num:
             self.reduce_samplers(taski,taski_num =num_i)
         train_loader.get_dataset(taski,memory=self.opt.memory,index_list=self.memory_index)
