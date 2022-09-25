@@ -7,6 +7,7 @@ common=dict(
     imgH = 32,
     imgW = 256,
     manual_seed=111,
+    start_task = 0
 )
 
 
