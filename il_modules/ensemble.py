@@ -91,7 +91,7 @@ class Ensem(BaseLearner):
         self.model = torch.nn.DataParallel(self.model).to(self.device)
         self.model.train()
 
-    def incremental_train(self, taski, character, train_loader, valid_loader):
+    def incremental_train(self, taski, character, train_loader, valid_loader, opt):
 
         # pre task classes for know classes
         # self._known_classes = self._total_classes
@@ -119,9 +119,38 @@ class Ensem(BaseLearner):
 
         # setup optimizer
         self.build_optimizer(filtered_parameters)
+        
+        if opt.start_task > taski:
 
-        """ start training """
-        self._train(0, taski, train_loader, valid_loader)
+            if taski > 0:
+
+                train_loader.get_dataset(taski, memory=None)
+                # valid_loader = valid_loader.create_dataset()
+
+                self.update_step1(0, taski, train_loader, valid_loader.create_dataset())
+                if self.opt.memory != None:
+                    self.build_rehearsal_memory(train_loader, taski)
+                else:
+                    train_loader.get_dataset(taski, memory=self.opt.memory)
+
+            if opt.ch_list!=None:
+                name = opt.ch_list[taski]
+            else:
+                name = opt.lan_list[taski]
+            saved_best_model = f"./saved_models/{opt.exp_name}/{name}_{taski}_best_score.pth"
+            # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
+            self.model.load_state_dict(torch.load(f"{saved_best_model}"))
+            print(
+            'Task {} load checkpoint from {}.'.format(taski, saved_best_model)
+            )
+
+        else:
+            print(
+            'Task {} start training.'.format(taski)
+            )
+            """ start training """
+            self._train(0, taski, train_loader, valid_loader)
+
 
     def build_rehearsal_memory(self,train_loader,taski):
         # Calculate the means of old classes with newly trained network
