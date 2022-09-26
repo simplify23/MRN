@@ -484,8 +484,8 @@ class Ensemble(nn.Module):
         route_info = self.channel_route(route_info).permute(0,2,1)
         # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
         index = self.route(route_info.contiguous())
-        # index = self.softargmax1d(torch.squeeze(index, -1))
-        index = torch.max(torch.squeeze(index, -1),-1)[1]
+        index = self.softargmax1d(torch.squeeze(index, -1))
+        index = torch.max(index,-1)[1]
         # index = torch.mean(torch.squeeze(index, -1), -1)
 
         # feature_array = torch.stack(features, 1)
