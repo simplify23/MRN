@@ -58,6 +58,50 @@ class Ensem(BaseLearner):
             for i in range(taski):
                 self.model.module.model[i].eval()
 
+    def build_custom_optimizer(self,filtered_parameters,optimizer="adam", schedule="super",scale=1.0):
+        if optimizer == "sgd":
+            optimizer = torch.optim.SGD(
+                filtered_parameters,
+                lr=self.opt.lr * scale,
+                momentum=self.opt.sgd_momentum,
+                weight_decay=self.opt.sgd_weight_decay,
+            )
+        elif optimizer == "adadelta":
+            optimizer = torch.optim.Adadelta(
+                filtered_parameters, lr=self.opt.lr * scale, rho=self.opt.rho, eps=self.opt.eps
+            )
+        elif optimizer == "adam":
+            optimizer = torch.optim.Adam(filtered_parameters, lr=self.opt.lr * scale)
+        # print("optimizer:")
+        # print(optimizer)
+        self.optimizer = optimizer
+        self.write_log(repr(optimizer) + "\n")
+
+        if "super" in schedule:
+            if optimizer == "sgd":
+                cycle_momentum = True
+            else:
+                cycle_momentum = False
+
+            scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                optimizer,
+                max_lr=self.opt.lr * scale,
+                cycle_momentum=cycle_momentum,
+                div_factor=20,
+                final_div_factor=1000,
+                total_steps=self.opt.num_iter,
+            )
+            # print("Scheduler:")
+            # print(scheduler)
+            self.scheduler = scheduler
+            self.write_log(repr(scheduler) + "\n")
+        elif schedule == "mlr":
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                optimizer=optimizer, milestones=self.opt.milestones, gamma=self.opt.lrate_decay
+            )
+            self.scheduler = scheduler
+            self.write_log(repr(scheduler) + "\n")
+
     def change_model(self,):
         """ model configuration """
         # model.module.reset_class(opt, device)
@@ -132,7 +176,7 @@ class Ensem(BaseLearner):
                 train_loader.get_dataset(taski, memory=None)
                 # valid_loader = valid_loader.create_dataset()
 
-                self.update_step1(0, taski, train_loader, valid_loader.create_dataset())
+                # self.update_step1(0, taski, train_loader, valid_loader.create_dataset())
                 if self.opt.memory != None:
                     self.build_rehearsal_memory(train_loader, taski)
                 else:
@@ -251,7 +295,7 @@ class Ensem(BaseLearner):
         self.model.module.model[-1].eval()
 
 
-    def _update_representation(self,start_iter, taski, train_loader, valid_loader,pi=1):
+    def _update_representation(self,start_iter, taski, train_loader, valid_loader,pi=5):
         # loss averager
         train_loss_avg = Averager()
 
@@ -265,7 +309,7 @@ class Ensem(BaseLearner):
         filtered_parameters = self.count_param(self.model)
 
         # setup optimizer
-        self.build_optimizer(filtered_parameters,scale=1)
+        self.build_custom_optimizer(filtered_parameters,optimizer="adam",schedule="mlr",scale=1)
 
         # for name, param in self.model.named_parameters():
         #     if param.requires_grad:
@@ -323,14 +367,15 @@ class Ensem(BaseLearner):
             self.optimizer.step()
             train_loss_avg.add(loss)
 
-            if "super" in self.opt.schedule:
-                self.scheduler.step()
-            else:
-                adjust_learning_rate(self.optimizer, iteration, self.opt)
+            self.scheduler.step()
+            # if "super" in self.opt.schedule:
+            #     self.scheduler.step()
+            # else:
+            #     adjust_learning_rate(self.optimizer, iteration, self.opt)
 
             # validation part.
             # To see training progress, we also conduct validation when 'iteration == 1'
-            if iteration % (self.opt.val_interval//5)== 0 or iteration == int(self.opt.num_iter//2):
+            if iteration % (self.opt.val_interval//5)== 0 or iteration == int(self.opt.num_iter//2) or iteration == 1:
                 # for validation log
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
                     train_loss_avg, taski,"TF")

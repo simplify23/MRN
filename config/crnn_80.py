@@ -1,5 +1,5 @@
 common=dict(
-    exp_name="CRNN_ems_random_5_db",  # Where to store logs and models
+    exp_name="CRNN_ems_random_5_db_pi_5",  # Where to store logs and models
     il="ems",  # base | lwf | wa | ewc ｜ der
     memory="test", # None | rehearsal | random | bag | score | loss_max
     memory_num=2000,
@@ -7,7 +7,7 @@ common=dict(
     imgH = 32,
     imgW = 256,
     manual_seed=111,
-    start_task = 2
+    start_task = 0
 )
 
 
@@ -32,6 +32,8 @@ optimizer=dict(
     lr=0.0005,
     sgd_momentum=0.9,
     sgd_weight_decay=0.000001,
+    milestones=[1000,2000,3000],
+    lrate_decay=0.1,
     rho=0.95,
     eps=1e-8,
     lr_drop_rate=0.1

@@ -119,6 +119,12 @@ class BaseLearner(object):
             # print(scheduler)
             self.scheduler = scheduler
             self.write_log(repr(scheduler) + "\n")
+        else:
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                optimizer=optimizer, milestones=self.opt.milestones, gamma=self.opt.lrate_decay
+            )
+            self.scheduler = scheduler
+            self.write_log(repr(scheduler) + "\n")
         # return scheduler,optimizer
 
 
