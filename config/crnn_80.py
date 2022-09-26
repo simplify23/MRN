@@ -7,7 +7,7 @@ common=dict(
     imgH = 32,
     imgW = 256,
     manual_seed=111,
-    start_task = 0
+    start_task = 2
 )
 
 
@@ -59,7 +59,7 @@ train = dict(
     total_data_usage_ratio="1.0",
     NED=True,
     batch_size=256,
-    num_iter=10,
+    num_iter=10000,
     val_interval=5000,
     log_multiple_test=None,
     FT="init",

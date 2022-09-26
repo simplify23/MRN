@@ -295,7 +295,7 @@ class Ensem(BaseLearner):
         self.model.module.model[-1].eval()
 
 
-    def _update_representation(self,start_iter, taski, train_loader, valid_loader,pi=5):
+    def _update_representation(self,start_iter, taski, train_loader, valid_loader,pi=10):
         # loss averager
         train_loss_avg = Averager()
 
@@ -309,7 +309,7 @@ class Ensem(BaseLearner):
         filtered_parameters = self.count_param(self.model)
 
         # setup optimizer
-        self.build_custom_optimizer(filtered_parameters,optimizer="adam",schedule="mlr",scale=1)
+        self.build_custom_optimizer(filtered_parameters,optimizer="adam",schedule="super",scale=1)
 
         # for name, param in self.model.named_parameters():
         #     if param.requires_grad:
