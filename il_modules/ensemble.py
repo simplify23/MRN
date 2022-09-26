@@ -144,7 +144,7 @@ class Ensem(BaseLearner):
                 name = opt.lan_list[taski]
             saved_best_model = f"./saved_models/{opt.exp_name}/{name}_{taski}_best_score.pth"
             # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
-            self.model.load_state_dict(torch.load(f"{saved_best_model}"))
+            self.model.load_state_dict(torch.load(f"{saved_best_model}"), strict=False)
             print(
             'Task {} load checkpoint from {}.'.format(taski, saved_best_model)
             )
@@ -235,7 +235,7 @@ class Ensem(BaseLearner):
 
             # validation part.
             # To see training progress, we also conduct validation when 'iteration == 1'
-            if iteration % self.opt.val_interval == 0 or iteration ==1:
+            if iteration % self.opt.val_interval == 0 or iteration ==self.opt.num_iter:
                 # for validation log
                 # print("66666666")
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
@@ -330,7 +330,7 @@ class Ensem(BaseLearner):
 
             # validation part.
             # To see training progress, we also conduct validation when 'iteration == 1'
-            if iteration % (self.opt.val_interval//5)== 0 or iteration == 1:
+            if iteration % (self.opt.val_interval//5)== 0 or iteration == int(self.opt.num_iter//2):
                 # for validation log
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
                     train_loss_avg, taski,"TF")
@@ -410,7 +410,7 @@ class Ensem(BaseLearner):
             name = self.opt.lan_list[taski]
         saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_best_score.pth"
         # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
-        self.model.load_state_dict(torch.load(f"{saved_best_model}"))
+        self.model.load_state_dict(torch.load(f"{saved_best_model}"),strict=False)
 
         task_accs = []
         ned_accs = []

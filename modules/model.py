@@ -412,8 +412,8 @@ class Ensemble(nn.Module):
         if cross==False:
             features = self.model[-1](image)["predict"]
             index = None
-        elif is_train == False:
-            features, index = self.cross_test(image)
+        # elif is_train == False:
+        #     features, index = self.cross_test(image)
         else:
             features,index = self.cross_forwardv2(image)
         # out=self.fc(features) #{logics: self.fc(features)}
@@ -456,7 +456,7 @@ class Ensemble(nn.Module):
         route_info = self.channel_route(route_info).permute(0,2,1)
         # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
         index = self.route(route_info.contiguous())
-        index = self.db_function(torch.squeeze(index,-1))
+        index = self.softargmax1d(torch.squeeze(index,-1))
         # index [B,I]
         # index = torch.max(torch.squeeze(index,-1),-1)[1]
         # index = torch.mean(torch.squeeze(index, -1), -1)
@@ -484,7 +484,7 @@ class Ensemble(nn.Module):
         route_info = self.channel_route(route_info).permute(0,2,1)
         # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
         index = self.route(route_info.contiguous())
-        index = self.db_function(torch.squeeze(index, -1))
+        index = self.softargmax1d(torch.squeeze(index, -1))
         index = torch.max(index,-1)[1]
         # index = torch.mean(torch.squeeze(index, -1), -1)
 
@@ -519,8 +519,8 @@ class Ensemble(nn.Module):
         # self.gmlp = GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
         self.gmlp = nn.Sequential(
             GatingMlpBlock(self.feature_dim,self.feature_dim//len(self.model),self.patch),
-            GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
-            GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
+            # GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
+            # GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
         )
         # [b, num_steps * len] -> [b, len]
         # if self.fc is not None:
@@ -563,7 +563,15 @@ class Ensemble(nn.Module):
         return copy.deepcopy(self)
 
     def db_function(self, x, k = 50):
-        return torch.reciprocal(1 + torch.exp(-k * x))
+        return torch.reciprocal(1 + torch.exp(-k * x))*1.2-0.1
+
+    def softargmax1d(self,input, beta=1000):
+        # *_, n = input.shape
+        # input = nn.functional.softmax(beta * input, dim=-1)
+        # indices = torch.linspace(0, 1, n).to(input.device)
+        # result = torch.sum((n - 1) * input * indices, dim=-1)
+
+        return nn.functional.softmax(beta * input, dim=-1)
 
     # def freeze(self):
     #     for param in self.parameters():
