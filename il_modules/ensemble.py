@@ -188,7 +188,7 @@ class Ensem(BaseLearner):
                 name = opt.lan_list[taski]
             saved_best_model = f"./saved_models/{opt.exp_name}/{name}_{taski}_best_score.pth"
             # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
-            self.model.load_state_dict(torch.load(f"{saved_best_model}"), strict=False)
+            self.model.load_state_dict(torch.load(f"{saved_best_model}"), strict=True)
             print(
             'Task {} load checkpoint from {}.'.format(taski, saved_best_model)
             )
@@ -283,7 +283,7 @@ class Ensem(BaseLearner):
                 # for validation log
                 # print("66666666")
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
-                    train_loss_avg, taski,"FF")
+                    train_loss_avg, None, taski,"FF")
                 train_loss_avg.reset()
 
     def update_step1(self,start_iter,taski, train_loader, valid_loader):
@@ -295,7 +295,7 @@ class Ensem(BaseLearner):
         self.model.module.model[-1].eval()
 
 
-    def _update_representation(self,start_iter, taski, train_loader, valid_loader,pi=10):
+    def _update_representation(self,start_iter, taski, train_loader, valid_loader,pi=5):
         # loss averager
         train_loss_avg = Averager()
 
@@ -417,10 +417,11 @@ class Ensem(BaseLearner):
         # validation log: loss, lr, score (accuracy or norm ED), time.
         lr = self.optimizer.param_groups[0]["lr"]
         elapsed_time = time.time() - start_time
-        valid_log = f"\n[{iteration}/{opt.num_iter}] Train_loss_clf: {train_loss_avg.val():0.5f}, Valid_loss: {valid_loss:0.5f} \n ",
-        valid_log += f'{"":9s}Train_taski_loss: {train_taski_loss_avg.val():0.5f}\n'
+        valid_log = f"\n[{iteration}/{opt.num_iter}] Train_loss_clf: {train_loss_avg.val():0.5f}, Valid_loss: {valid_loss:0.5f} \n "
+        if train_taski_loss_avg != None:
+            valid_log += f'{"":9s}Train_taski_loss: {train_taski_loss_avg.val():0.5f}\n'
         # valid_log += f", Semi_loss: {semi_loss_avg.val():0.5f}\n"
-        valid_log += f'{"":9s}Current_score: {current_score:0.2f},   Ned_score: {ned_score:0.2f}\n'
+        valid_log += f'{"":9s}Current_score: {current_score:0.2f}, Ned_score: {ned_score:0.2f}\n'
         valid_log += f'{"":9s}Current_lr: {lr:0.7f}, Best_score: {best_score:0.2f}\n'
         valid_log += f'{"":9s}Infer_time: {infer_time:0.2f},     Elapsed_time: {elapsed_time:0.2f}\n'
 
@@ -459,7 +460,7 @@ class Ensem(BaseLearner):
             name = self.opt.lan_list[taski]
         saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_best_score.pth"
         # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
-        self.model.load_state_dict(torch.load(f"{saved_best_model}"),strict=False)
+        self.model.load_state_dict(torch.load(f"{saved_best_model}"),strict=True)
 
         task_accs = []
         ned_accs = []
