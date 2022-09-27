@@ -507,6 +507,33 @@ class Ensemble(nn.Module):
         # return out  # [b, num_steps, opt.num_class]
         return output.contiguous(),index
 
+    def cross_forwardv3(self, image, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        features = [convnet(image)for convnet in self.model]
+        route_info = torch.cat([feature["feature"] for feature in features],-1)
+        route_info = self.gmlp(route_info)
+        route_info = self.channel_route(route_info)
+        # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
+        # index = self.route(route_info.contiguous())
+        index = self.softargmax1d(torch.squeeze(route_info,-1))
+        # route_info [B,T,I]
+        # index = torch.squeeze(route_info,-1)
+
+        # feature_array = torch.stack(features, 1)
+        features = [feature["predict"] for feature in features]
+        B,T,C = features[-1].size()
+        list_len = len(features)
+        normal_feat = []
+        for i in range(list_len-1):
+            feat = self.pad_zeros_features(features[i],total=C)
+            normal_feat.append(feat)
+        normal_feat.append(features[-1])
+        normal_feat = torch.stack(normal_feat,0)
+        # normal_feat [I,B,T,C] -> [C,B,T,I] -> [B,T,C,I]
+        output = (normal_feat.permute(3,1,2,0).contiguous() * route_info).permute(1,2,0,3).contiguous()
+
+        return torch.sum(output,-1),index
+
     def update_fc(self, hidden_size, nb_classes,device=None):
         self.model.append(Model(self.opt))
         self.model[-1].new_fc(hidden_size,nb_classes)
