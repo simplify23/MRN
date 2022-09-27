@@ -1,5 +1,5 @@
 common=dict(
-    exp_name="CRNN_ems_random_5_CycleLR",  # Where to store logs and models
+    exp_name="CRNN_ems_random_6_bug",  # Where to store logs and models
     il="ems",  # base | lwf | wa | ewc ｜ der
     memory="test", # None | rehearsal | random | bag | score | loss_max
     memory_num=2000,
@@ -7,7 +7,7 @@ common=dict(
     imgH = 32,
     imgW = 256,
     manual_seed=111,
-    start_task = 2
+    start_task = 0
 )
 
 
@@ -59,7 +59,7 @@ train = dict(
     total_data_usage_ratio="1.0",
     NED=True,
     batch_size=256,
-    num_iter=10000,
+    num_iter=10,
     val_interval=5000,
     log_multiple_test=None,
     FT="init",

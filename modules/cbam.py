@@ -15,9 +15,15 @@ class SpatialGatingUnit(nn.Module):
     def forward(self, x):
         u, v = x.chunk(2, dim=-1)
         v = self.norm(v)
-        v = v.permute(0, 2, 1)
+        if v.dim()==4:
+            v = v.permute(0, 1, 3, 2).contiguous()
+        elif v.dim()==3:
+            v = v.permute(0, 2, 1)
         v = self.proj(v)
-        v = v.permute(0, 2, 1)
+        if v.dim()==4:
+            v = v.permute(0, 1, 3, 2).contiguous()
+        elif v.dim()==3:
+            v = v.permute(0, 2, 1)
         return u * v
 
 

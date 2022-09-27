@@ -16,7 +16,7 @@ from torch.autograd import Variable
 from data.dataset import hierarchical_dataset
 from il_modules.base import BaseLearner
 from il_modules.der import DER
-from modules.model import DERNet, Ensemble
+from modules.model import DERNet, Ensemble, Ensemblev2
 from test import validation
 from tools.utils import Averager, adjust_learning_rate
 
@@ -42,12 +42,12 @@ class Ensem(BaseLearner):
 
     def __init__(self, opt):
         super().__init__(opt)
-        self.model = Ensemble(opt)
+        self.model = Ensemblev2(opt)
+        # self.model = Ensemble(opt)
 
     def after_task(self):
         # will we need this line ? (AB Study)
         self.model = self.model.module
-
         self._known_classes = self._total_classes
         # logging.info('Exemplar size: {}'.format(self.exemplar_size))
 
@@ -118,7 +118,7 @@ class Ensem(BaseLearner):
     def build_model(self):
         """ model configuration """
 
-        self.model.update_fc(self.opt.hidden_size, self._total_classes)
+        self.model.build_fc(self.opt.hidden_size, self._total_classes)
         self.model.build_prediction(self.opt, self._total_classes)
 
         # weight initialization
@@ -195,7 +195,7 @@ class Ensem(BaseLearner):
 
         else:
             print(
-            'Task {} start training.'.format(taski)
+            'Task {} start training for model ------{}------'.format(taski,opt.exp_name)
             )
             """ start training """
             self._train(0, taski, train_loader, valid_loader)
