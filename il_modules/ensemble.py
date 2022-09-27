@@ -42,8 +42,8 @@ class Ensem(BaseLearner):
 
     def __init__(self, opt):
         super().__init__(opt)
-        self.model = Ensemblev2(opt)
-        # self.model = Ensemble(opt)
+        # self.model = Ensemblev2(opt)
+        self.model = Ensemble(opt)
 
     def after_task(self):
         # will we need this line ? (AB Study)

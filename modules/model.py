@@ -412,8 +412,8 @@ class Ensemble(nn.Module):
         if cross==False:
             features = self.model[-1](image)["predict"]
             index = None
-        elif is_train == False:
-            features, index = self.cross_test(image)
+        # elif is_train == False:
+        #     features, index = self.cross_test(image)
         else:
             features,index = self.cross_forwardv2(image)
         # out=self.fc(features) #{logics: self.fc(features)}
@@ -456,11 +456,11 @@ class Ensemble(nn.Module):
         route_info = self.channel_route(route_info).permute(0,2,1)
         # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
         index = self.route(route_info.contiguous())
-        # index = self.softargmax1d(torch.squeeze(index,-1))
+        index = self.softargmax1d(torch.squeeze(index,-1))
         # index [B,I]
         # index = torch.max(torch.squeeze(index,-1),-1)[1]
         # index = torch.mean(torch.squeeze(index, -1), -1)
-        index = torch.squeeze(index,-1)
+        # index = torch.squeeze(index,-1)
 
         # feature_array = torch.stack(features, 1)
         features = [feature["predict"] for feature in features]
@@ -595,7 +595,7 @@ class Ensemble(nn.Module):
         return copy.deepcopy(self)
 
     def db_function(self, x, k = 50):
-        return torch.reciprocal(1 + torch.exp(-k * x))*1.2-0.1
+        return torch.reciprocal(1 + torch.exp(-k * x))
 
     def softargmax1d(self,input, beta=10):
         # *_, n = input.shape
