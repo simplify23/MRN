@@ -299,7 +299,7 @@ class Ensem(BaseLearner):
         # loss averager
         train_loss_avg = Averager()
 
-        # train_taski_loss_avg = Averager()
+        train_taski_loss_avg = Averager()
         # loss_taski = nn.MSELoss()
         #
         # self.model_eval_and_train(taski)
@@ -357,7 +357,8 @@ class Ensem(BaseLearner):
                     aux_logits.view(-1, aux_logits.shape[-1]), aux_targets.contiguous().view(-1)
                 )
             # loss = loss_clf + loss_aux
-            loss = loss_clf + pi * taski_loss
+            # loss = loss_clf + pi * taski_loss
+            loss = pi * loss_clf + taski_loss
             # loss.requires_grad_(True)
             self.model.zero_grad()
             loss.backward()
@@ -365,7 +366,8 @@ class Ensem(BaseLearner):
                 self.model.parameters(), self.opt.grad_clip
             )  # gradient clipping with 5 (Default)
             self.optimizer.step()
-            train_loss_avg.add(loss)
+            train_loss_avg.add(loss_clf)
+            train_taski_loss_avg.add(taski_loss)
 
             self.scheduler.step()
             # if "super" in self.opt.schedule:
@@ -378,11 +380,12 @@ class Ensem(BaseLearner):
             if iteration % (self.opt.val_interval//5)== 0 or iteration == int(self.opt.num_iter//2) or iteration == 1:
                 # for validation log
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
-                    train_loss_avg, taski,"TF")
+                    train_loss_avg,train_taski_loss_avg, taski,"TF")
                 train_loss_avg.reset()
+                train_taski_loss_avg.reset()
 
     def val(self, valid_loader, opt, best_score, start_time, iteration,
-            train_loss_avg, taski, val_choose="val"):
+            train_loss_avg, train_taski_loss_avg, taski, val_choose="val"):
         self.model.eval()
         with torch.no_grad():
             (
@@ -414,7 +417,8 @@ class Ensem(BaseLearner):
         # validation log: loss, lr, score (accuracy or norm ED), time.
         lr = self.optimizer.param_groups[0]["lr"]
         elapsed_time = time.time() - start_time
-        valid_log = f"\n[{iteration}/{opt.num_iter}] Train_loss: {train_loss_avg.val():0.5f}, Valid_loss: {valid_loss:0.5f} \n "
+        valid_log = f"\n[{iteration}/{opt.num_iter}] Train_loss_clf: {train_loss_avg.val():0.5f}, Valid_loss: {valid_loss:0.5f} \n ",
+        valid_log += f'{"":9s}Train_taski_loss: {train_taski_loss_avg.val():0.5f}\n'
         # valid_log += f", Semi_loss: {semi_loss_avg.val():0.5f}\n"
         valid_log += f'{"":9s}Current_score: {current_score:0.2f},   Ned_score: {ned_score:0.2f}\n'
         valid_log += f'{"":9s}Current_lr: {lr:0.7f}, Best_score: {best_score:0.2f}\n'
