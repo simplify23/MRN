@@ -653,10 +653,11 @@ class Ensemblev2(Ensemble):
         # I, B, T, C -> sum() ->
         route_info = self.normal_fc(route_info)
         route_info = self.route_atten(route_info)
-        # route_info = self.channel_route(route_info)
+        route_info = self.channel_route(route_info)
         # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
         # index = self.route(route_info.contiguous())
-        index = self.softargmax1d(torch.squeeze(route_info,-1),1)
+        route_info = self.softargmax1d(torch.squeeze(route_info,-1),1).permute(1,2,0).contiguous()
+        index = route_info.mean(-2)
         # route_info [I,B,T,C] -> [I,B,T] -> [B,T,I]
 
         features = [feature["predict"] for feature in features]
@@ -682,6 +683,7 @@ class Ensemblev2(Ensemble):
             self.out_dim=self.model[-1].SequenceModeling_output
         # self.route = nn.Linear(self.patch * len(self.model), len(self.model))
         self.route = nn.Linear(self.patch , 1)
+        self.channel_route = nn.Linear(self.out_dim, 1)
         self.normal_fc = nn.Linear(self.out_dim,self.out_dim)
         # self.gmlp = GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
         self.route_atten = nn.Sequential(
@@ -732,4 +734,4 @@ class Ensemblev2(Ensemble):
         # indices = torch.linspace(0, 1, n).to(input.device)
         # result = torch.sum((n - 1) * input * indices, dim=-1)
 
-        return nn.functional.softmax(beta * input, dim=-1)
+        return nn.functional.softmax(beta * input, dim=0)
