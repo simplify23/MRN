@@ -13,7 +13,7 @@ from data.dataset import concat_dataset, AlignCollate, LmdbDataset, AlignCollate
 
 class Dataset_Manager(object):
     def __init__(self):
-        # self.data_list = []
+        self.data_list = []
         self.data_loader_list = []
         self.dataloader_iter_list = []
         self.select_data = None
@@ -41,6 +41,30 @@ class Dataset_Manager(object):
         else:
             self.create_dataloader(dataset)
         return index_list
+
+    def joint_start(
+        self, opt, dataset_root, select_data, log, taski,total_task):
+        self.opt = opt
+        self.select_data = select_data
+        dashed_line = "-" * 80
+        print(dashed_line)
+        log.write(dashed_line + "\n")
+        # print(
+        #     f"dataset_root: {dataset_root}\n select_data: {select_data}\n"
+        # )
+        # log.write(
+        #     f"dataset_root: {dataset_root}\n select_data: {select_data}\n"
+        # )
+
+
+        dataset = self.create_dataset(data_list=self.select_data, taski=taski)
+        if opt.il == "joint_mix":
+            self.data_list.append(dataset)
+            if taski == total_task-1:
+                self.create_dataloader(ConcatDataset(self.data_list), int(self.opt.batch_size))
+        elif opt.il == "joint":
+            self.create_dataloader(dataset, int(self.opt.batch_size // total_task))
+
 
     def init_start(
         self, opt, dataset_root, select_data, log, taski,memory="random"):

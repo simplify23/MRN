@@ -160,14 +160,16 @@ def validation(model, criterion, eval_loader, converter, opt, val_choose="val",t
 
         if "CTC" in opt.Prediction:
             start_time = time.time()
-            if val_choose == "val" or val_choose == "FF":
+            if val_choose == "FF":
                 preds = model(image, cross = False, is_train = False)
-            elif val_choose == "test" or val_choose == "TF":
+            elif val_choose == "TF":
                 preds = model(image,cross = True, is_train = False)
             else:
                 preds = model(image)
             if len(preds)==3:
                 preds = preds['logits']
+            elif len(preds) == 2:
+                preds = preds['predict']
             forward_time = time.time() - start_time
 
             # Calculate evaluation loss for CTC deocder.

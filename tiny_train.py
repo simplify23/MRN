@@ -299,6 +299,7 @@ def train(opt, log):
         tmp_char = dict()
         """dataset preparation"""
         select_data = opt.select_data
+        AlignCollate_valid = AlignCollate(opt, mode="test")
 
         # # set batch_ratio for each data.
         # if opt.batch_ratio:
@@ -310,6 +311,20 @@ def train(opt, log):
         # train_loader = Batch_Balanced_Dataset(
         #     opt, train_data, select_data, batch_ratio, log,taski
         # )
+        if opt.il =="joint" or opt.il == "joint_mix":
+            valid_datas = []
+            for taski in range(len(train_datasets)):
+                # train_data = os.path.join(opt.train_data, train_datasets[taski])
+                valid_data = os.path.join(opt.valid_data, valid_datasets[taski])
+                valid_datas.append(valid_data)
+                data_manager.joint_start(opt, train_data, select_data, log, taski, len(train_datasets))
+            # -------load char to dict --------#
+                for data_path in opt.select_data:
+                    opt.character, tmp_char = load_dict(data_path + f"/{opt.lan_list[taski]}", char, tmp_char)
+            learner.incremental_train(0,opt.character, data_manager, valid_loader)
+            """ Evaluation at the end of training """
+            best_scores, ned_scores = learner.test(AlignCollate_valid, valid_datas, best_scores, ned_scores, 0)
+            break
         if taski == 0:
             data_manager.init_start(opt, train_data, select_data, log, taski, memory=None)
         train_loader = data_manager
@@ -321,7 +336,7 @@ def train(opt, log):
             else:
                 opt.character,tmp_char = load_dict(data_path+f"/{opt.lan_list[taski]}",char,tmp_char)
         # char_score = count_char_score(tmp_char)
-        AlignCollate_valid = AlignCollate(opt, mode="test")
+
         # valid_dataset, valid_dataset_log = hierarchical_dataset(
         #     root=valid_data, opt=opt, mode="test"
         # )

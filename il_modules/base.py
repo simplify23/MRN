@@ -235,7 +235,7 @@ class BaseLearner(object):
 
             # default recognition loss part
             if "CTC" in self.opt.Prediction:
-                preds = self.model(image)
+                preds = self.model(image)["predict"]
                 preds_size = torch.IntTensor([preds.size(1)] * batch_size)
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
                 loss = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
