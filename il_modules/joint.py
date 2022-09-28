@@ -111,7 +111,8 @@ class JointLearner(BaseLearner):
                 # for validation log
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
                     train_loss_avg, taski)
-                self.test(AlignCollate_valid,valid_datas,best_scores,ned_scores,taski)
-                self.model.train()
+                if iteration != 1:
+                    self.test(AlignCollate_valid,valid_datas,best_scores,ned_scores,taski)
+                    self.model.train()
                 train_loss_avg.reset()
                 semi_loss_avg.reset()
