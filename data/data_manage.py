@@ -62,7 +62,7 @@ class Dataset_Manager(object):
             self.data_list.append(dataset)
             if taski == total_task-1:
                 self.create_dataloader(ConcatDataset(self.data_list), int(self.opt.batch_size))
-        elif opt.il == "joint":
+        elif opt.il == "joint_loader":
             self.create_dataloader(dataset, int(self.opt.batch_size // total_task))
 
 

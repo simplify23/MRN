@@ -10,6 +10,7 @@ from il_modules.base import BaseLearner
 from il_modules.der import DER
 from il_modules.ensemble import Ensem
 from il_modules.ewc import EWC
+from il_modules.joint import JointLearner
 from il_modules.lwf import LwF
 from il_modules.wa import WA
 
@@ -285,6 +286,8 @@ def train(opt, log):
         learner = DER(opt)
     elif opt.il =="ems":
         learner = Ensem(opt)
+    elif opt.il == "joint_mix" or opt.il == "joint_loader":
+        learner = JointLearner(opt)
     else:
         learner = BaseLearner(opt)
 
@@ -311,7 +314,7 @@ def train(opt, log):
         # train_loader = Batch_Balanced_Dataset(
         #     opt, train_data, select_data, batch_ratio, log,taski
         # )
-        if opt.il =="joint" or opt.il == "joint_mix":
+        if opt.il =="joint_loader" or opt.il == "joint_mix":
             valid_datas = []
             for taski in range(len(train_datasets)):
                 # train_data = os.path.join(opt.train_data, train_datasets[taski])
@@ -321,7 +324,7 @@ def train(opt, log):
             # -------load char to dict --------#
                 for data_path in opt.select_data:
                     opt.character, tmp_char = load_dict(data_path + f"/{opt.lan_list[taski]}", char, tmp_char)
-            learner.incremental_train(0,opt.character, data_manager, valid_loader)
+            learner.incremental_train(0,opt.character, data_manager, valid_loader,AlignCollate_valid,valid_datas)
             """ Evaluation at the end of training """
             best_scores, ned_scores = learner.test(AlignCollate_valid, valid_datas, best_scores, ned_scores, 0)
             break

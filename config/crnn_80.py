@@ -1,6 +1,6 @@
 common=dict(
     exp_name="CRNN_joint_mix",  # Where to store logs and models
-    il="joint_mix",  # joint_mix ｜ joint | base | lwf | wa | ewc ｜ der  | ems
+    il="joint_mix",  # joint_mix ｜ joint_loader | base | lwf | wa | ewc ｜ der  | ems
     memory=None, # None | rehearsal | random | bag | score | loss_max
     memory_num=2000,
     batch_max_length = 25,
@@ -60,7 +60,7 @@ train = dict(
     NED=True,
     batch_size=256,
     num_iter=6,
-    val_interval=5000,
+    val_interval=3,
     log_multiple_test=None,
     FT="init",
     grad_clip=5,
