@@ -326,7 +326,7 @@ def train(opt, log):
                     opt.character, tmp_char = load_dict(data_path + f"/{opt.lan_list[taski]}", char, tmp_char)
             learner.incremental_train(0,opt.character, data_manager, valid_loader,AlignCollate_valid,valid_datas)
             """ Evaluation at the end of training """
-            best_scores, ned_scores = learner.test(AlignCollate_valid, valid_datas, best_scores, ned_scores, 0)
+            # best_scores, ned_scores = learner.test(AlignCollate_valid, valid_datas, best_scores, ned_scores, 0)
             break
         if taski == 0:
             data_manager.init_start(opt, train_data, select_data, log, taski, memory=None)
