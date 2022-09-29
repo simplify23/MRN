@@ -42,8 +42,8 @@ class Ensem(BaseLearner):
 
     def __init__(self, opt):
         super().__init__(opt)
-        self.model = Ensemblev2(opt)
-        # self.model = Ensemble(opt)
+        # self.model = Ensemblev2(opt)
+        self.model = Ensemble(opt)
 
     def after_task(self):
         # will we need this line ? (AB Study)
@@ -295,7 +295,7 @@ class Ensem(BaseLearner):
         self.model.module.model[-1].eval()
 
 
-    def _update_representation(self,start_iter, taski, train_loader, valid_loader,pi=5):
+    def _update_representation(self,start_iter, taski, train_loader, valid_loader,pi=10):
         # loss averager
         train_loss_avg = Averager()
 
