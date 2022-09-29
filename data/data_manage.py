@@ -21,7 +21,7 @@ class Dataset_Manager(object):
     def get_dataset(self, taski, memory="random_memory",index_list=None):
         self.data_loader_list = []
         self.dataloader_iter_list = []
-        memory_num = 4000
+        memory_num = 3000
 
         dataset = self.create_dataset(data_list=self.select_data,taski=taski)
 
