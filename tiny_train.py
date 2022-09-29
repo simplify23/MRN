@@ -324,7 +324,7 @@ def train(opt, log):
             # -------load char to dict --------#
                 for data_path in opt.select_data:
                     opt.character, tmp_char = load_dict(data_path + f"/{opt.lan_list[taski]}", char, tmp_char)
-            learner.incremental_train(0,opt.character, data_manager, valid_loader,AlignCollate_valid,valid_datas)
+            best_scores,ned_scores = learner.incremental_train(0,opt.character, data_manager, valid_loader,AlignCollate_valid,valid_datas)
             """ Evaluation at the end of training """
             # best_scores, ned_scores = learner.test(AlignCollate_valid, valid_datas, best_scores, ned_scores, 0)
             break

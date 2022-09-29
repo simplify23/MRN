@@ -116,3 +116,4 @@ class JointLearner(BaseLearner):
                     self.model.train()
                 train_loss_avg.reset()
                 semi_loss_avg.reset()
+        return best_scores,ned_scores
