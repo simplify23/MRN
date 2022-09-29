@@ -252,6 +252,7 @@ class Model(nn.Module):
         self.fc = fc
 
     def new_fc(self, hidden_size, nb_classes,device=None):
+        # print("new_fc")
         self.fc = nn.Linear(hidden_size, nb_classes)
 
     def weight_align(self, increment):
@@ -266,6 +267,7 @@ class Model(nn.Module):
 
     def build_prediction(self,opt,num_class):
         """Prediction"""
+        # print("build_prediction")
         if opt.Prediction == "CTC":
             # self.fc = nn.Linear(self.SequenceModeling_output, num_class)
             self.Prediction = self.fc

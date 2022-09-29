@@ -14,7 +14,7 @@ from mmcv import Config
 from nltk.metrics.distance import edit_distance
 from tqdm import tqdm
 
-from utils import CTCLabelConverter, AttnLabelConverter, Averager
+from tools.utils import CTCLabelConverter, AttnLabelConverter, Averager
 from data.dataset import hierarchical_dataset, AlignCollate
 from modules.model import Model
 
