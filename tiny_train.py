@@ -295,8 +295,9 @@ def train(opt, log):
     
     for taski in range(len(train_datasets)):
         train_data = os.path.join(opt.train_data, train_datasets[taski])
-        valid_data = os.path.join(opt.valid_data, valid_datasets[taski])
-        valid_datas.append(valid_data)
+        for valid_data in opt.valid_datas:
+            val_data = os.path.join(valid_data, valid_datasets[taski])
+            valid_datas.append(val_data)
 
         valid_loader = Val_Dataset(valid_datas,opt)
         tmp_char = dict()
@@ -318,8 +319,9 @@ def train(opt, log):
             valid_datas = []
             for taski in range(len(train_datasets)):
                 # train_data = os.path.join(opt.train_data, train_datasets[taski])
-                valid_data = os.path.join(opt.valid_data, valid_datasets[taski])
-                valid_datas.append(valid_data)
+                for val_data in opt.opt.valid_datas:
+                    valid_data = os.path.join(val_data, valid_datasets[taski])
+                    valid_datas.append(valid_data)
                 data_manager.joint_start(opt, train_data, select_data, log, taski, len(train_datasets))
             # -------load char to dict --------#
                 for data_path in opt.select_data:
@@ -339,23 +341,6 @@ def train(opt, log):
             else:
                 opt.character,tmp_char = load_dict(data_path+f"/{opt.lan_list[taski]}",char,tmp_char)
         # char_score = count_char_score(tmp_char)
-
-        # valid_dataset, valid_dataset_log = hierarchical_dataset(
-        #     root=valid_data, opt=opt, mode="test"
-        # )
-        # valid_loader = torch.utils.data.DataLoader(
-        #     valid_dataset,
-        #     batch_size=opt.batch_size,
-        #     shuffle=True,  # 'True' to check training progress with validation function.
-        #     num_workers=int(opt.workers),
-        #     collate_fn=AlignCollate_valid,
-        #     pin_memory=False,
-        # )
-        # log.write(valid_dataset_log)
-        # print("-" * 80)
-        # log.write("-" * 80 + "\n")
-        # log.close()
-
         # ----- incremental model start -------
 
         learner.incremental_train(taski, opt.character, train_loader, valid_loader, opt)
