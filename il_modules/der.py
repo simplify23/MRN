@@ -94,6 +94,7 @@ class DER(BaseLearner):
         # self._known_classes = self._total_classes
         self.character = character
         self.converter = self.build_converter()
+        valid_loader = valid_loader.create_dataset()
 
         if taski > 0:
             self.change_model()
@@ -130,8 +131,8 @@ class DER(BaseLearner):
     def _init_train(self,start_iter,taski, train_loader, valid_loader):
         # loss averager
         train_loss_avg = Averager()
-        train_clf_loss = None
-        train_aux_loss = None
+        train_clf_loss = Averager()
+        train_aux_loss = Averager()
         start_time = time.time()
         best_score = -1
 

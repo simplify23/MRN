@@ -31,7 +31,7 @@ T=2
 lamda=1000
 fishermax=0.0001
 alpha = 0.5
-num_iter = 10
+num_iter = 1000
 
 class EWC(BaseLearner):
     def __init__(self, opt):
