@@ -343,7 +343,7 @@ def train(opt, log):
         # char_score = count_char_score(tmp_char)
         # ----- incremental model start -------
 
-        learner.incremental_train(taski, opt.character, train_loader, valid_loader, opt)
+        learner.incremental_train(taski, opt.character, train_loader, valid_loader)
 
         # ----- incremental model end -------
         """ Evaluation at the end of training """

@@ -187,15 +187,32 @@ class BaseLearner(object):
 
         # print opt config
         # self.print_config(self.opt)
+        if opt.start_task > taski:
+
+            if taski > 0:
+                if self.opt.memory != None:
+                    self.build_rehearsal_memory(train_loader, taski)
+                else:
+                    train_loader.get_dataset(taski, memory=self.opt.memory)
+
+            if opt.ch_list!=None:
+                name = self.opt.ch_list[taski]
+            else:
+                name = self.opt.lan_list[taski]
+            saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_best_score.pth"
+            # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
+            self.model.load_state_dict(torch.load(f"{saved_best_model}"), strict=True)
+            print(
+            'Task {} load checkpoint from {}.'.format(taski, saved_best_model)
+            )
+
+        else:
+            print(
+            'Task {} start training for model ------{}------'.format(taski,opt.exp_name)
+            )
 
         """ start training """
         start_iter = 0
-        if self.opt.saved_model != "":
-            try:
-                start_iter = int(self.saved_model.split("_")[-1].split(".")[0])
-                print(f"continue to train, start_iter: {start_iter}")
-            except:
-                pass
 
         self._train(start_iter,taski, train_loader, valid_loader)
 

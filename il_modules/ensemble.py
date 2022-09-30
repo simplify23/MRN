@@ -140,7 +140,7 @@ class Ensem(BaseLearner):
         self.model = torch.nn.DataParallel(self.model).to(self.device)
         self.model.train()
 
-    def incremental_train(self, taski, character, train_loader, valid_loader, opt):
+    def incremental_train(self, taski, character, train_loader, valid_loader):
 
         # pre task classes for know classes
         # self._known_classes = self._total_classes
@@ -169,36 +169,10 @@ class Ensem(BaseLearner):
 
         # setup optimizer
         self.build_optimizer(filtered_parameters)
-        
-        if opt.start_task > taski:
 
-            if taski > 0:
-                train_loader.get_dataset(taski, memory=None)
-                # valid_loader = valid_loader.create_dataset()
-
-                # self.update_step1(0, taski, train_loader, valid_loader.create_dataset())
-                if self.opt.memory != None:
-                    self.build_rehearsal_memory(train_loader, taski)
-                else:
-                    train_loader.get_dataset(taski, memory=self.opt.memory)
-
-            if opt.ch_list!=None:
-                name = opt.ch_list[taski]
-            else:
-                name = opt.lan_list[taski]
-            saved_best_model = f"./saved_models/{opt.exp_name}/{name}_{taski}_best_score.pth"
-            # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
-            self.model.load_state_dict(torch.load(f"{saved_best_model}"), strict=True)
-            print(
-            'Task {} load checkpoint from {}.'.format(taski, saved_best_model)
-            )
-
-        else:
-            print(
-            'Task {} start training for model ------{}------'.format(taski,opt.exp_name)
-            )
-            """ start training """
-            self._train(0, taski, train_loader, valid_loader)
+        self._train(0, taski, train_loader, valid_loader,step=0)
+        if taski >0:
+            self._train(0, taski, train_loader, valid_loader, step=1)
 
 
     def build_rehearsal_memory(self,train_loader,taski):
@@ -217,21 +191,45 @@ class Ensem(BaseLearner):
         print("Is using rehearsal memory, has {} prev datasets, each has {}\n".format(len(self.memory_index),self.memory_index[0].size))
 
 
-    def _train(self, start_iter,taski, train_loader, valid_loader):
-        if taski == 0:
-            # valid_loader = valid_loader.create_dataset()
-            self._init_train(start_iter,taski, train_loader, valid_loader.create_dataset(),cross=False)
-        else:
-            train_loader.get_dataset(taski, memory=None)
-            # valid_loader = valid_loader.create_dataset()
+    def _train(self, start_iter,taski, train_loader, valid_loader,step=0):
 
-            self.update_step1(start_iter,taski, train_loader, valid_loader.create_dataset())
-            if self.opt.memory != None:
-                self.build_rehearsal_memory(train_loader, taski)
-            else:
-                train_loader.get_dataset(taski, memory=self.opt.memory)
-            self._update_representation(start_iter,taski, train_loader, valid_loader.create_list_dataset())
-            # self.model.module.weight_align(self._total_classes - self._known_classes)
+        if self.opt.start_task > taski + step *0.5:
+            name = self.opt.lan_list[taski]
+            saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_{step}_best_score.pth"
+            self.model.load_state_dict(torch.load(f"{saved_best_model}"), strict=True)
+            print(
+                'Task {} load checkpoint from {}.'.format(taski, saved_best_model)
+            )
+
+            if taski > 0 and step == 0:
+                train_loader.get_dataset(taski, memory=None)
+                self.freeze_step1(taski)
+                # self.update_step1(0, taski, train_loader, valid_loader.create_dataset())
+            elif taski > 0 and step ==1:
+                if self.opt.memory != None:
+                    self.build_rehearsal_memory(train_loader, taski)
+                else:
+                    train_loader.get_dataset(taski, memory=self.opt.memory)
+
+        else:
+            print(
+                'Task {} start training for model ------{}------'.format(taski, self.opt.exp_name)
+            )
+            """ start training """
+            if taski == 0:
+                # valid_loader = valid_loader.create_dataset()
+                self._init_train(start_iter,taski, train_loader, valid_loader.create_dataset(),cross=False)
+            elif step == 0:
+                train_loader.get_dataset(taski, memory=None)
+                # valid_loader = valid_loader.create_dataset()
+                self.update_step1(start_iter,taski, train_loader, valid_loader.create_dataset())
+            elif step == 1:
+                if self.opt.memory != None:
+                    self.build_rehearsal_memory(train_loader, taski)
+                else:
+                    train_loader.get_dataset(taski, memory=self.opt.memory)
+                self._update_representation(start_iter,taski, train_loader, valid_loader.create_list_dataset())
+                # self.model.module.weight_align(self._total_classes - self._known_classes)
 
     def _init_train(self,start_iter,taski, train_loader, valid_loader,cross=False):
         # loss averager
@@ -287,12 +285,20 @@ class Ensem(BaseLearner):
                 # for validation log
                 # print("66666666")
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
-                    train_loss_avg, None, taski,"FF")
+                    train_loss_avg, None, taski,0,"FF")
                 train_loss_avg.reset()
 
     def update_step1(self,start_iter,taski, train_loader, valid_loader):
         self.model_eval_and_train(taski)
         self._init_train(start_iter, taski, train_loader, valid_loader,cross=False)
+        self.model.train()
+        for p in self.model.module.model[-1].parameters():
+            p.requires_grad = False
+        self.model.module.model[-1].eval()
+
+    def freeze_step1(self,  taski):
+        self.model_eval_and_train(taski)
+        # self._init_train(start_iter, taski, train_loader, valid_loader, cross=False)
         self.model.train()
         for p in self.model.module.model[-1].parameters():
             p.requires_grad = False
@@ -384,12 +390,12 @@ class Ensem(BaseLearner):
             if iteration % (self.opt.val_interval//5)== 0 or iteration == int(self.opt.num_iter//2) or iteration == 1:
                 # for validation log
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
-                    train_loss_avg,train_taski_loss_avg, taski,"TF")
+                    train_loss_avg,train_taski_loss_avg, taski, step=1,val_choose = "TF")
                 train_loss_avg.reset()
                 train_taski_loss_avg.reset()
 
     def val(self, valid_loader, opt, best_score, start_time, iteration,
-            train_loss_avg, train_taski_loss_avg, taski, val_choose="val"):
+            train_loss_avg, train_taski_loss_avg, taski, step,val_choose="val"):
         self.model.eval()
         with torch.no_grad():
             (
@@ -415,7 +421,7 @@ class Ensem(BaseLearner):
                 name = opt.lan_list[taski]
             torch.save(
                 self.model.state_dict(),
-                f"./saved_models/{opt.exp_name}/{name}_{taski}_best_score.pth",
+                f"./saved_models/{opt.exp_name}/{name}_{taski}_{step}_best_score.pth",
             )
 
         # validation log: loss, lr, score (accuracy or norm ED), time.
@@ -453,8 +459,10 @@ class Ensem(BaseLearner):
         print("---Start evaluation on benchmark testset----")
         if taski == 0:
             val_choose = "FF"
+            step=0
         else:
             val_choose = "TF"
+            step=1
         """ keep evaluation model and result logs """
         os.makedirs(f"./result/{self.opt.exp_name}", exist_ok=True)
         os.makedirs(f"./evaluation_log", exist_ok=True)
@@ -462,7 +470,7 @@ class Ensem(BaseLearner):
             name = self.opt.ch_list[taski]
         else:
             name = self.opt.lan_list[taski]
-        saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_best_score.pth"
+        saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_{step}_best_score.pth"
         # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
         self.model.load_state_dict(torch.load(f"{saved_best_model}"),strict=True)
 
