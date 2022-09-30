@@ -31,7 +31,7 @@ T=2
 lamda=1000
 fishermax=0.0001
 alpha = 0.5
-num_iter = 1000
+num_iter = 10
 
 class EWC(BaseLearner):
     def __init__(self, opt):
@@ -47,7 +47,7 @@ class EWC(BaseLearner):
         if taski == 0:
             self._init_train(start_iter,taski, train_loader, valid_loader)
         else:
-            if self.opt.memory == "rehearsal" or self.opt.memory == "random":
+            if self.opt.memory != None:
                 self.build_rehearsal_memory(train_loader, taski)
             else:
                 train_loader.get_dataset(taski, memory=self.opt.memory)
@@ -90,13 +90,13 @@ class EWC(BaseLearner):
 
             # default recognition loss part
             if "CTC" in self.opt.Prediction:
-                preds = self.model(image)
+                preds = self.model(image)["predict"]
                 preds_size = torch.IntTensor([preds.size(1)] * batch_size)
                 # B，T，C(max) -> T, B, C
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
                 loss_clf = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
             else:
-                preds = self.model(image, labels_index[:, :-1])  # align with Attention.forward
+                preds = self.model(image, labels_index[:, :-1])["predict"]  # align with Attention.forward
                 target = labels_index[:, 1:]  # without [SOS] Symbol
                 loss_clf = self.criterion(
                     preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
@@ -155,13 +155,13 @@ class EWC(BaseLearner):
 
             # default recognition loss part
             if "CTC" in self.opt.Prediction:
-                preds = self.model(image)
+                preds = self.model(image)["predict"]
                 preds_size = torch.IntTensor([preds.size(1)] * batch_size)
                 # B，T，C(max) -> T, B, C
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
                 loss = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
             else:
-                preds = self.model(image, labels_index[:, :-1])  # align with Attention.forward
+                preds = self.model(image, labels_index[:, :-1])["predict"]  # align with Attention.forward
                 target = labels_index[:, 1:]  # without [SOS] Symbol
                 loss= self.criterion(
                     preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)

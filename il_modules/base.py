@@ -187,7 +187,7 @@ class BaseLearner(object):
 
         # print opt config
         # self.print_config(self.opt)
-        if opt.start_task > taski:
+        if self.opt.start_task > taski:
 
             if taski > 0:
                 if self.opt.memory != None:
@@ -195,7 +195,7 @@ class BaseLearner(object):
                 else:
                     train_loader.get_dataset(taski, memory=self.opt.memory)
 
-            if opt.ch_list!=None:
+            if self.opt.ch_list!=None:
                 name = self.opt.ch_list[taski]
             else:
                 name = self.opt.lan_list[taski]
@@ -208,7 +208,7 @@ class BaseLearner(object):
 
         else:
             print(
-            'Task {} start training for model ------{}------'.format(taski,opt.exp_name)
+            'Task {} start training for model ------{}------'.format(taski,self.opt.exp_name)
             )
 
         """ start training """
@@ -257,7 +257,7 @@ class BaseLearner(object):
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
                 loss = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
             else:
-                preds = self.model(image, labels_index[:, :-1])  # align with Attention.forward
+                preds = self.model(image, labels_index[:, :-1])["predict"]  # align with Attention.forward
                 target = labels_index[:, 1:]  # without [SOS] Symbol
                 loss = self.criterion(
                     preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)

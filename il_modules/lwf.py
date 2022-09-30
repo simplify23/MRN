@@ -65,15 +65,15 @@ class LwF(BaseLearner):
 
             # default recognition loss part
             if "CTC" in self.opt.Prediction:
-                preds = self.model(image)
-                old_preds = self._old_network(image)
+                preds = self.model(image)["predict"]
+                old_preds = self._old_network(image)["predict"]
                 preds_size = torch.IntTensor([preds.size(1)] * batch_size)
                 # B，T，C(max) -> T, B, C
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
                 loss_clf = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
             else:
-                preds = self.model(image, labels_index[:, :-1])  # align with Attention.forward
-                old_preds = self._old_network(image, labels_index[:, :-1])
+                preds = self.model(image, labels_index[:, :-1])["predict"]  # align with Attention.forward
+                old_preds = self._old_network(image, labels_index[:, :-1])["predict"]
                 target = labels_index[:, 1:]  # without [SOS] Symbol
                 loss_clf = self.criterion(
                     preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
