@@ -1,6 +1,7 @@
 import copy
 
 import torch
+from einops import rearrange
 import torch.nn as nn
 
 from modules.block import GatingMlpBlock
@@ -545,6 +546,7 @@ class Ensemble(nn.Module):
         features = [convnet(image) for convnet in self.model]
         route_info = torch.stack([feature["feature"] for feature in features], 1)
         route_info = self.mlp3d(route_info)
+        route_info = rearrange(route_info, 'b h w c -> b w (h c)')
         route_info = self.channel_route(route_info).permute(0, 2, 1)
         # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
         index = self.route(route_info.contiguous())
@@ -589,9 +591,9 @@ class Ensemble(nn.Module):
             GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
         )
         self.mlp3d = nn.Sequential(
-            PermutatorBlock(self.feature_dim, self.feature_dim // len(self.model)),
-            PermutatorBlock(self.feature_dim, self.feature_dim // len(self.model)),
-            PermutatorBlock(self.feature_dim, self.feature_dim // len(self.model)),
+            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
+            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
+            # PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
         )
         # [b, num_steps * len] -> [b, len]
         # if self.fc is not None:

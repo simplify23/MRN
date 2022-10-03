@@ -169,7 +169,7 @@ class CycleMLP(nn.Module):
 
 class CycleBlock(nn.Module):
 
-    def __init__(self, dim, mlp_hidden_dim, qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
+    def __init__(self, dim, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, skip_lam=1.0, mlp_fn=CycleMLP):
         super().__init__()
         self.norm1 = norm_layer(dim)
@@ -179,7 +179,7 @@ class CycleBlock(nn.Module):
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
 
         self.norm2 = norm_layer(dim)
-        # mlp_hidden_dim = int(dim * mlp_ratio)
+        mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer)
         self.skip_lam = skip_lam
 
@@ -214,7 +214,7 @@ class WeightedPermuteMLP(nn.Module):
         w = self.mlp_w(w).reshape(B, H, self.segment_dim, W, S).permute(0, 1, 3, 2, 4).reshape(B, H, W, C)
 
         c = self.mlp_c(x)
-
+        # B, C, H, W -> B, C,[ H, W ]
         a = (h + w + c).permute(0, 3, 1, 2).flatten(2).mean(2)
         a = self.reweight(a).reshape(B, C, 3).permute(2, 0, 1).softmax(dim=0).unsqueeze(2).unsqueeze(2)
 
@@ -225,20 +225,69 @@ class WeightedPermuteMLP(nn.Module):
 
         return x
 
+class WeightedPermuteMLPv2(nn.Module):
+    def __init__(self, dim, segment_dim=8, qkv_bias=False, taski=1,patch=63, proj_drop=0.):
+        super().__init__()
+        self.segment_dim = segment_dim
+
+        self.mlp_c = nn.Sequential(
+                    nn.Linear(dim, dim, bias=qkv_bias),
+                                   )
+        self.mlp_h = nn.Sequential(
+                    nn.Linear(taski, dim, bias=qkv_bias),
+                    nn.Linear(dim, taski, bias=qkv_bias),
+                                   )
+        self.mlp_w = nn.Sequential(
+                    nn.Linear(patch, dim, bias=qkv_bias),
+                    nn.Linear(dim, patch, bias=qkv_bias),
+                                   )
+        self.reweight = Mlp(dim, dim // 4, dim * 3)
+
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+    def forward(self, x):
+        B, H, W, C = x.shape
+        # print(x.shape)
+
+        h = x.permute(0,3,2,1)
+        h = self.mlp_h(h).permute(0, 3, 2 , 1)
+        # B,C, H,W -> B,H,W,C
+        w = x.permute(0, 3, 1, 2)
+        w = self.mlp_w(w).permute(0, 2, 3, 1)
+
+        # S = C // self.segment_dim
+        # h = x.reshape(B, H, W, self.segment_dim, S).permute(0, 3, 2, 1, 4).reshape(B, self.segment_dim, W, H * S)
+        # h = self.mlp_h(h).reshape(B, self.segment_dim, W, H, S).permute(0, 3, 2, 1, 4).reshape(B, H, W, C)
+
+        # w = x.reshape(B, H, W, self.segment_dim, S).permute(0, 1, 3, 2, 4).reshape(B, H, self.segment_dim, W * S)
+        # w = self.mlp_w(w).reshape(B, H, self.segment_dim, W, S).permute(0, 1, 3, 2, 4).reshape(B, H, W, C)
+
+        c = self.mlp_c(x)
+        # B, C, H, W -> B, C,[ H, W ]
+        a = (h + w + c).permute(0, 3, 1, 2).flatten(2).mean(2)
+        a = self.reweight(a).reshape(B, C, 3).permute(2, 0, 1).softmax(dim=0).unsqueeze(2).unsqueeze(2)
+
+        x = h * a[0] + w * a[1] + c * a[2]
+
+        x = self.proj(x)
+        x = self.proj_drop(x)
+
+        return x
 
 class PermutatorBlock(nn.Module):
 
-    def __init__(self, dim, mlp_hidden_dim, segment_dim=8, qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, skip_lam=1.0, mlp_fn=WeightedPermuteMLP):
+    def __init__(self, dim, mlp_ratio=4., taski = 1, patch = 63, segment_dim=8, qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
+                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, skip_lam=1.0, mlp_fn=WeightedPermuteMLPv2):
         super().__init__()
         self.norm1 = norm_layer(dim)
-        self.attn = mlp_fn(dim, segment_dim=segment_dim, qkv_bias=qkv_bias, qk_scale=None, attn_drop=attn_drop)
+        self.attn = mlp_fn(dim, segment_dim=segment_dim, taski=taski,patch=patch,qkv_bias=qkv_bias)
 
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
 
         self.norm2 = norm_layer(dim)
-        # mlp_hidden_dim = int(dim * mlp_ratio)
+        mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer)
         self.skip_lam = skip_lam
 
