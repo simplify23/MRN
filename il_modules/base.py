@@ -594,8 +594,8 @@ class BaseLearner(object):
             list19.append(best_score[i*2+1])
         score17 = round(sum(list17) / len(list17), 2)
         score19 = round(sum(list19) / len(list19), 2)
-        print(f'Task {taski} : 2017 Acc: {score17:0.2f} 2019 Acc: {score19:0.2f} \n ')
-        self.write_data_log(f'Task {taski} : 2017 Acc: {score17:0.2f} 2019 Acc: {score19:0.2f} \n ')
+        print(f'Task{taski} : 2017Acc: {score17:0.2f} 2019Acc: {score19:0.2f} \n ')
+        self.write_data_log(f'Task{taski} : 2017Acc: {score17:0.2f} 2019Acc: {score19:0.2f} \n ')
         self.write_data_log(f'17 acc: {list17}\n  19 acc: {list19}\n')
 
 
