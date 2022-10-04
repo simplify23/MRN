@@ -576,11 +576,27 @@ class BaseLearner(object):
         ned_scores.append(round(sum(ned_accs) / len(ned_accs),2))
 
         acc_log= f'Task {taski} Test Average Incremental Accuracy: {best_scores[taski]} \n Task {taski} Incremental Accuracy: {task_accs}\n ned_acc: {ned_accs}\n'
-        self.write_data_log(f'{taski} Avg Acc: {best_scores[taski]:0.2f} \n  acc: {task_accs}\n')
+        self.write_log(acc_log)
 
         print(acc_log)
-        self.write_log(acc_log)
+        if (taski+1) * 2 ==  len(best_scores[taski]):
+            self.double_write(taski,best_scores[taski])
+        else:
+            self.write_data_log(f'{taski} Avg Acc: {best_scores[taski]:0.2f} \n  acc: {task_accs}\n')
+        self.write_data_log(f"----------- {self.opt.exp_name} ------------\n")
         return best_scores,ned_scores
+
+    def double_write(self,taski, best_score):
+        list17 = []
+        list19 = []
+        for i in range(taski+1):
+            list17.append(best_score[i*2])
+            list19.append(best_score[i*2+1])
+        score17 = round(sum(list17) / len(list17), 2)
+        score19 = round(sum(list19) / len(list19), 2)
+        self.write_data_log(f'Task {taski} : 2017 Acc: {score17:0.2f} 2019 Acc: {score19:0.2f} \n ')
+        self.write_data_log(f'17 acc: {list17}\n  19 acc: {list19}\n')
+
 
     # def count_param(self):
     #     filtered_parameters = []
