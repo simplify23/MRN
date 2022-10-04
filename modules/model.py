@@ -638,7 +638,7 @@ class Ensemble(nn.Module):
     def db_function(self, x, k = 50):
         return torch.reciprocal(1 + torch.exp(-k * x))
 
-    def softargmax1d(self,input, beta=5):
+    def softargmax1d(self,input, beta=2):
         # *_, n = input.shape
         # input = nn.functional.softmax(beta * input, dim=-1)
         # indices = torch.linspace(0, 1, n).to(input.device)

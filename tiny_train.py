@@ -350,6 +350,8 @@ def train(opt, log):
         best_scores,ned_scores = learner.test(AlignCollate_valid,valid_datas,best_scores,ned_scores, taski)
         learner.after_task()
 
+    write_data_log(f"----------- {opt.exp_name} ------------\n")
+    print(f"----------- {opt.exp_name} ------------\n")
     print(
             'ALL Average Incremental Accuracy: {:.2f} '.format(sum(best_scores)/len(best_scores))
         )
