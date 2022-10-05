@@ -593,7 +593,7 @@ class Ensemble(nn.Module):
         self.mlp3d = nn.Sequential(
             PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch,mlp_fn=CycleMLP),
             PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch,mlp_fn=CycleMLP),
-            # PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
+            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch,mlp_fn=CycleMLP),
         )
         # [b, num_steps * len] -> [b, len]
         # if self.fc is not None:
