@@ -547,14 +547,12 @@ class Ensemble(nn.Module):
         route_info = torch.stack([feature["feature"] for feature in features], 1)
         route_info = self.mlp3d(route_info)
         route_info = rearrange(route_info, 'b h w c -> b w (h c)')
-        route_info = self.channel_route(route_info).permute(0, 2, 1)
+        route_info = self.channel_route(route_info)
         # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
-        index = self.route(route_info.contiguous())
+        index = self.route(route_info.permute(0, 2, 1).contiguous())
         index = self.softargmax1d(torch.squeeze(index, -1))
         # index [B,I]
-        # index = torch.max(torch.squeeze(index,-1),-1)[1]
-        # index = torch.mean(torch.squeeze(index, -1), -1)
-        # index = torch.squeeze(index,-1)
+        # route_info [B,T,I]
 
         # feature_array = torch.stack(features, 1)
         features = [feature["predict"] for feature in features]
@@ -567,7 +565,8 @@ class Ensemble(nn.Module):
         normal_feat.append(features[-1])
         normal_feat = torch.stack(normal_feat, 0)
         # normal_feat [I,B,T,C] -> [T,C,B,I] -> [B,T,C,I]
-        output = (normal_feat.permute(2, 3, 1, 0) * index).permute(2, 0, 1, 3).contiguous()
+        # output = (normal_feat.permute(2, 3, 1, 0) * index).permute(2, 0, 1, 3).contiguous()
+        output = (normal_feat.permute(3,1,2,0) * route_info).permute(1,2,0,3).contiguous()
 
         return torch.sum(output, -1), index
 
