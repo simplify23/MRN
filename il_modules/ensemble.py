@@ -519,8 +519,8 @@ class Ensem(BaseLearner):
         self.write_log(acc_log)
 
         print(acc_log)
-        if (taski+1) * 2 ==  len(best_scores[taski]):
-            self.double_write(taski,best_scores[taski])
+        if (taski+1) * 2 == len(task_accs):
+            self.double_write(taski,task_accs)
         else:
             self.write_data_log(f'{taski} Avg Acc: {best_scores[taski]:0.2f} \n  acc: {task_accs}\n')
         self.write_data_log(f"----------- {self.opt.exp_name} ------------\n")

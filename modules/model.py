@@ -5,7 +5,7 @@ from einops import rearrange
 import torch.nn as nn
 
 from modules.block import GatingMlpBlock
-from modules.mlp import PermutatorBlock
+from modules.mlp import PermutatorBlock, CycleMLP
 from modules.transformation import TPS_SpatialTransformerNetwork
 from modules.feature_extraction import (
     VGG_FeatureExtractor,
@@ -591,8 +591,8 @@ class Ensemble(nn.Module):
             GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
         )
         self.mlp3d = nn.Sequential(
-            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
-            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
+            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch,mlp_fn=CycleMLP),
+            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch,mlp_fn=CycleMLP),
             # PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
         )
         # [b, num_steps * len] -> [b, len]

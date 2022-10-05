@@ -138,7 +138,7 @@ class CycleFC(nn.Module):
 
 
 class CycleMLP(nn.Module):
-    def __init__(self, dim, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
+    def __init__(self, dim, segment_dim=8, qkv_bias=False, taski=1,patch=63, proj_drop=0.):
         super().__init__()
         self.mlp_c = nn.Linear(dim, dim, bias=qkv_bias)
 
@@ -152,6 +152,7 @@ class CycleMLP(nn.Module):
 
     def forward(self, x):
         B, H, W, C = x.shape
+        # B,C,H,W
         h = self.sfc_h(x.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
         w = self.sfc_w(x.permute(0, 3, 1, 2)).permute(0, 2, 3, 1)
         c = self.mlp_c(x)
