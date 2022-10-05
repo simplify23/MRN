@@ -571,19 +571,22 @@ class BaseLearner(object):
             task_accs.append(round(current_score,2))
             ned_accs.append(round(ned_score,2))
 
+        self.write_data_log(f"----------- {self.opt.exp_name} Task {taski}------------\n")
 
-        best_scores.append(round(sum(task_accs) / len(task_accs),2))
-        ned_scores.append(round(sum(ned_accs) / len(ned_accs),2))
-
-        acc_log= f'Task {taski} Test Average Incremental Accuracy: {best_scores[taski]} \n Task {taski} Incremental Accuracy: {task_accs}\n ned_acc: {ned_accs}\n'
-        self.write_log(acc_log)
-
-        print(acc_log)
-        if (taski+1) * 2 ==  len(task_accs):
-            self.double_write(taski,task_accs)
+        if (taski+1) * 2 == len(task_accs):
+            score17,score19 = self.double_write(taski,task_accs)
+            best_scores.append(score17)
+            ned_scores.append(score19)
+            acc_log = f'Task {taski} Avg Incremental Acc:  17: {best_scores[taski]}    19: {ned_scores[taski]}\n Task {taski} 17 Acc: {task_accs}\n 19 Acc: {ned_accs}\n'
+            self.write_log(acc_log)
+            print(acc_log)
         else:
+            best_scores.append(round(sum(task_accs) / len(task_accs), 2))
+            ned_scores.append(round(sum(ned_accs) / len(ned_accs), 2))
+            acc_log = f'Task {taski} Test Average Incremental Accuracy: {best_scores[taski]} \n Task {taski} Incremental Accuracy: {task_accs}\n ned_acc: {ned_accs}\n'
+            self.write_log(acc_log)
+            print(acc_log)
             self.write_data_log(f'{taski} Avg Acc: {best_scores[taski]:0.2f} \n  acc: {task_accs}\n')
-        self.write_data_log(f"----------- {self.opt.exp_name} ------------\n")
         return best_scores,ned_scores
 
     def double_write(self,taski, best_score):
@@ -594,9 +597,10 @@ class BaseLearner(object):
             list19.append(best_score[i*2+1])
         score17 = round(sum(list17) / len(list17), 2)
         score19 = round(sum(list19) / len(list19), 2)
-        print(f'Task{taski} : 2017Acc: {score17:0.2f} 2019Acc: {score19:0.2f} \n ')
-        self.write_data_log(f'Task{taski} : 2017Acc: {score17:0.2f} 2019Acc: {score19:0.2f} \n ')
-        self.write_data_log(f'17 acc: {list17}\n  19 acc: {list19}\n')
+        print(f'Task{taski} : 2017: {score17:0.2f} 2019: {score19:0.2f} \n ')
+        self.write_data_log(f'Task{taski} : 2017: {score17:0.2f} 2019: {score19:0.2f}\n')
+        self.write_data_log(f'17 acc: {list17}\n19 acc: {list19}\n')
+        return score17,score19
 
 
     # def count_param(self):

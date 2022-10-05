@@ -506,24 +506,22 @@ class Ensem(BaseLearner):
             ned_accs.append(round(ned_score,2))
 
 
-        best_scores.append(round(sum(task_accs) / len(task_accs),2))
-        ned_scores.append(round(sum(ned_accs) / len(ned_accs),2))
+        self.write_data_log(f"----------- {self.opt.exp_name} Task {taski}------------\n")
 
-        # acc_log= f'Task {taski} Test Average Incremental Accuracy: {best_scores[taski]} \n Task {taski} Incremental Accuracy: {task_accs}\n ned_acc: {ned_accs}\n'
-        # self.write_data_log(f'{taski} Avg Acc: {best_scores[taski]:0.2f} \n  acc: {task_accs}\n')
-        #
-        # print(acc_log)
-        # self.write_log(acc_log)
-        # return best_scores,ned_scores
-        acc_log= f'Task {taski} Test Average Incremental Accuracy: {best_scores[taski]} \n Task {taski} Incremental Accuracy: {task_accs}\n ned_acc: {ned_accs}\n'
-        self.write_log(acc_log)
-
-        print(acc_log)
         if (taski+1) * 2 == len(task_accs):
-            self.double_write(taski,task_accs)
+            score17,score19 = self.double_write(taski,task_accs)
+            best_scores.append(score17)
+            ned_scores.append(score19)
+            acc_log = f'Task {taski} Avg Incremental Acc:  17: {best_scores[taski]}    19: {ned_scores[taski]}\n Task {taski} 17 Acc: {task_accs}\n 19 Acc: {ned_accs}\n'
+            self.write_log(acc_log)
+            print(acc_log)
         else:
+            best_scores.append(round(sum(task_accs) / len(task_accs), 2))
+            ned_scores.append(round(sum(ned_accs) / len(ned_accs), 2))
+            acc_log = f'Task {taski} Test Average Incremental Accuracy: {best_scores[taski]} \n Task {taski} Incremental Accuracy: {task_accs}\n ned_acc: {ned_accs}\n'
+            self.write_log(acc_log)
+            print(acc_log)
             self.write_data_log(f'{taski} Avg Acc: {best_scores[taski]:0.2f} \n  acc: {task_accs}\n')
-        self.write_data_log(f"----------- {self.opt.exp_name} ------------\n")
         return best_scores,ned_scores
 
 

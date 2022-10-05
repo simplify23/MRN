@@ -352,10 +352,20 @@ def train(opt, log):
 
     write_data_log(f"----------- {opt.exp_name} ------------\n")
     print(f"----------- {opt.exp_name} ------------\n")
-    print(
-            'ALL Average Incremental Accuracy: {:.2f} \n'.format(sum(best_scores)/len(best_scores))
+    if len(opt.valid_datas) == 1:
+        print(
+                'ALL Average Incremental Accuracy: {:.2f} \n'.format(sum(best_scores)/len(best_scores))
+            )
+        write_data_log('ALL Average Acc: {:.2f} \n'.format(sum(best_scores)/len(best_scores)))
+    elif len(opt.valid_datas) == 2:
+        print(
+            'ALL Average 17 Acc: {:.2f} \n'.format(sum(best_scores) / len(best_scores))
         )
-    write_data_log('ALL Average Acc: {:.2f} \n'.format(sum(best_scores)/len(best_scores)))
+        print(
+            'ALL Average 19 Acc: {:.2f} \n'.format(sum(ned_scores) / len(ned_scores))
+        )
+        write_data_log('ALL 17 Acc: {:.2f} \n'.format(sum(best_scores) / len(best_scores)))
+        write_data_log('ALL 19 Acc: {:.2f} \n'.format(sum(ned_scores) / len(ned_scores)))
 
 def val(model, criterion, valid_loader, converter, opt,optimizer,best_score,start_time,iteration,train_loss_avg,taski):
     with open(f"./saved_models/{opt.exp_name}/log_train.txt", "a") as log:

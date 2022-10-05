@@ -565,8 +565,8 @@ class Ensemble(nn.Module):
         normal_feat.append(features[-1])
         normal_feat = torch.stack(normal_feat, 0)
         # normal_feat [I,B,T,C] -> [T,C,B,I] -> [B,T,C,I]
-        # output = (normal_feat.permute(2, 3, 1, 0) * index).permute(2, 0, 1, 3).contiguous()
-        output = (normal_feat.permute(3,1,2,0) * route_info).permute(1,2,0,3).contiguous()
+        output = (normal_feat.permute(2, 3, 1, 0) * index).permute(2, 0, 1, 3).contiguous()
+        # output = (normal_feat.permute(3,1,2,0) * route_info).permute(1,2,0,3).contiguous()
 
         return torch.sum(output, -1), index
 
@@ -590,9 +590,9 @@ class Ensemble(nn.Module):
             GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
         )
         self.mlp3d = nn.Sequential(
-            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch,mlp_fn=CycleMLP),
-            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch,mlp_fn=CycleMLP),
-            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch,mlp_fn=CycleMLP),
+            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
+            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
+            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
         )
         # [b, num_steps * len] -> [b, len]
         # if self.fc is not None:
