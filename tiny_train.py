@@ -319,7 +319,7 @@ def train(opt, log):
             valid_datas = []
             for taski in range(len(train_datasets)):
                 # train_data = os.path.join(opt.train_data, train_datasets[taski])
-                for val_data in opt.opt.valid_datas:
+                for val_data in opt.valid_datas:
                     valid_data = os.path.join(val_data, valid_datasets[taski])
                     valid_datas.append(valid_data)
                 data_manager.joint_start(opt, train_data, select_data, log, taski, len(train_datasets))

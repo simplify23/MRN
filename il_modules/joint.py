@@ -51,7 +51,7 @@ class JointLearner(BaseLearner):
             except:
                 pass
 
-        self._init_train(start_iter,taski, train_loader, valid_loader,AlignCollate_valid,valid_datas)
+        return self._init_train(start_iter,taski, train_loader, valid_loader,AlignCollate_valid,valid_datas)
 
     def _init_train(self,start_iter,taski, train_loader, valid_loader,AlignCollate_valid,valid_datas):
         # loss averager
@@ -112,7 +112,7 @@ class JointLearner(BaseLearner):
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
                     train_loss_avg, taski)
                 if iteration != 1:
-                    self.test(AlignCollate_valid,valid_datas,best_scores,ned_scores,taski)
+                    best_scores,ned_scores = self.test(AlignCollate_valid,valid_datas,best_scores,ned_scores,taski)
                     self.model.train()
                 train_loss_avg.reset()
                 semi_loss_avg.reset()
