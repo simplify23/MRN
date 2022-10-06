@@ -291,7 +291,7 @@ def train(opt, log):
     else:
         learner = BaseLearner(opt)
 
-    data_manager = Dataset_Manager()
+    data_manager = Dataset_Manager(opt)
     
     for taski in range(len(train_datasets)):
         train_data = os.path.join(opt.train_data, train_datasets[taski])

@@ -12,25 +12,26 @@ from data.dataset import concat_dataset, AlignCollate, LmdbDataset, AlignCollate
 
 
 class Dataset_Manager(object):
-    def __init__(self):
+    def __init__(self,opt):
         self.data_list = []
         self.data_loader_list = []
         self.dataloader_iter_list = []
         self.select_data = None
+        self.opt = opt
 
     def get_dataset(self, taski, memory="random_memory",index_list=None):
         self.data_loader_list = []
         self.dataloader_iter_list = []
-        memory_num = 3000
+        memory_num = self.opt.memory_num
 
         dataset = self.create_dataset(data_list=self.select_data,taski=taski)
 
         if memory == "test":
-            index_current = numpy.random.choice(range(len(dataset)),int(2000/taski),replace=False)
+            index_current = numpy.random.choice(range(len(dataset)),int(self.opt.memory_num/taski),replace=False)
             split_dataset = Subset(dataset,index_current.tolist())
-            memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=2000,index_array=index_list)
+            memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=self.opt.memory_num,index_array=index_list)
             self.create_dataloader_mix(IndexConcatDataset([memory_data,split_dataset]),self.opt.batch_size)
-            print("taski is {} current dataset chose {}\n now dataset chose {}".format(taski,int(2000/taski),len(memory_data)))
+            print("taski is {} current dataset chose {}\n now dataset chose {}".format(taski,int(self.opt.memory_num/taski),len(memory_data)))
         elif memory == "large":
             index_current = numpy.random.choice(range(len(dataset)), memory_num, replace=False)
             split_dataset = Subset(dataset, index_current.tolist())
@@ -39,7 +40,7 @@ class Dataset_Manager(object):
             print("taski is {} current dataset chose {}\n now dataset chose {}".format(taski, int(memory_num),
                                                                                        len(memory_data)))
         elif memory != None:
-            memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=2000,index_array=index_list)
+            memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=memory_num,index_array=index_list)
             self.create_dataloader(memory_data,(self.opt.batch_size)//2)
             self.create_dataloader(dataset,(self.opt.batch_size)//2)
         # elif memory == "rehearsal":

@@ -178,13 +178,13 @@ class Ensem(BaseLearner):
     def build_rehearsal_memory(self,train_loader,taski):
         # Calculate the means of old classes with newly trained network
         memory_num = self.opt.memory_num
-        if memory_num >= 3000:
+        if memory_num >= 5000:
             num_i = memory_num
         else:
             num_i = int(memory_num / (taski))
         # self.build_queue_bag_memory(num_i, taski, train_loader)
         self.build_random_current_memory(num_i, taski, train_loader)
-        if memory_num < 3000:
+        if memory_num < 5000:
             if len(self.memory_index) != 0 and len(self.memory_index)*len(self.memory_index[0]) > memory_num:
                 self.reduce_samplers(taski,taski_num =num_i)
         train_loader.get_dataset(taski,memory=self.opt.memory,index_list=self.memory_index)
