@@ -83,8 +83,8 @@ class AttnLabelConverter(object):
         # character (str): set of the possible characters.
         # [SOS] (start-of-sentence token) and [EOS] (end-of-sentence token) for the attention decoder.
         list_special_token = [
-            "[PAD]",
             "[UNK]",
+            "[PAD]",
             "[SOS]",
             "[EOS]",
             " ",

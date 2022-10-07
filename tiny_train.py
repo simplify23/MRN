@@ -275,15 +275,15 @@ def train(opt, log):
     opt_log += "---------------------------------------\n"
     # print(opt_log)
     log.write(opt_log)
-    if opt.il =="lwf":
+    if opt.il == "lwf":
         learner = LwF(opt)
     elif opt.il == "wa":
         learner = WA(opt)
-    elif opt.il =="ewc":
+    elif opt.il == "ewc":
         learner = EWC(opt)
     elif opt.il == "der":
         learner = DER(opt)
-    elif opt.il =="ems":
+    elif opt.il == "ems":
         learner = Ensem(opt)
     elif opt.il == "joint_mix" or opt.il == "joint_loader":
         learner = JointLearner(opt)

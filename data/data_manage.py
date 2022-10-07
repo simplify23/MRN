@@ -19,6 +19,7 @@ class Dataset_Manager(object):
         self.select_data = None
         self.opt = opt
 
+
     def get_dataset(self, taski, memory="random_memory",index_list=None):
         self.data_loader_list = []
         self.dataloader_iter_list = []

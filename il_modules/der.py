@@ -243,8 +243,8 @@ class DER(BaseLearner):
                 loss_aux = self.criterion(
                     aux_logits.view(-1, aux_logits.shape[-1]), aux_targets.contiguous().view(-1)
                 )
-            # loss = loss_clf + loss_aux
-            loss = loss_clf
+            loss = loss_clf + loss_aux
+            # loss = loss_clf
 
             self.model.zero_grad()
             loss.backward()

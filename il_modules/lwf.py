@@ -84,8 +84,8 @@ class LwF(BaseLearner):
             #     preds_log_softmax[:, self._known_classes:], fake_targets
             # )
             loss_kd = _KD_loss(
-                preds.view(-1,preds.shape[-1])[:, : self._known_classes],
-                old_preds.view(-1,old_preds.shape[-1])[:, : self._known_classes],
+                preds.view(-1,preds.shape[-1])[:, 1: self._known_classes],
+                old_preds.view(-1,old_preds.shape[-1])[:, 1: self._known_classes],
                 T,
             )
 

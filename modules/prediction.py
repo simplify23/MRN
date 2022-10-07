@@ -33,7 +33,7 @@ class Attention(nn.Module):
         return n2
 
     def cut_unknown(self,index):
-        return torch.where(index >= self.num_class, 1, index)
+        return torch.where(index >= self.num_class, 0, index)
 
     def forward(self, batch_H, text, is_train=True, batch_max_length=25):
         """
