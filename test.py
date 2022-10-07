@@ -189,8 +189,10 @@ def validation(model, criterion, eval_loader, converter, opt, val_choose="val",t
 
             start_time = time.time()
             preds = model(image, text_for_pred, is_train=False)
-            if len(preds)==3:
+            if len(preds) == 3:
                 preds = preds['logits']
+            elif len(preds) == 2:
+                preds = preds['predict']
             forward_time = time.time() - start_time
 
             target = labels_index[:, 1:]  # without [SOS] Symbol
