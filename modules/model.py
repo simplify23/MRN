@@ -398,6 +398,9 @@ class Ensemble(nn.Module):
         self.opt = opt
         self.task_sizes = []
         self.patch = 63
+        self.mlp = "vip"
+        self.layer_num = 3
+        self.beta = 5
 
     @property
     def feature_dim(self):
@@ -550,7 +553,7 @@ class Ensemble(nn.Module):
         route_info = self.channel_route(route_info)
         # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
         index = self.route(route_info.permute(0, 2, 1).contiguous())
-        index = self.softargmax1d(torch.squeeze(index, -1))
+        index = self.softargmax1d(torch.squeeze(index, -1),self.beta)
         # index [B,I]
         # route_info [B,T,I]
 
@@ -584,16 +587,27 @@ class Ensemble(nn.Module):
         self.route = nn.Linear(self.patch , 1)
         self.channel_route = nn.Linear(self.feature_dim, len(self.model))
         # self.gmlp = GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
-        self.gmlp = nn.Sequential(
-            GatingMlpBlock(self.feature_dim,self.feature_dim//len(self.model),self.patch),
-            GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
-            GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
-        )
-        self.mlp3d = nn.Sequential(
-            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
-            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
-            PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
-        )
+        # self.gmlp = nn.Sequential(
+        #     GatingMlpBlock(self.feature_dim,self.feature_dim//len(self.model),self.patch),
+        #     GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
+        #     GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
+        # )
+        if self.mlp == "gmlp":
+            block = GatingMlpBlock(self.out_dim, self.out_dim * 2, self.patch)
+        elif self.mlp == "vip":
+            block = PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch)
+        else:
+            block = nn.Linear(self.out_dim, self.out_dim )
+        layers=[]
+        for _ in range(self.layer_num):
+            layers.append(block)
+        print("mlp {} has {} layers".format(block, len(layers)))
+        # self.mlp3d = nn.Sequential(
+        #     PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
+        #     PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
+        #     PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch),
+        # )
+        self.mlp3d = nn.Sequential(*layers)
         # [b, num_steps * len] -> [b, len]
         # if self.fc is not None:
         #     nb_output = self.fc.out_features
