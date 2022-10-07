@@ -250,7 +250,7 @@ class Model(nn.Module):
             fc.weight.data[:nb_output] = weight
             fc.bias.data[:nb_output] = bias
 
-        del self.fc
+        # del self.fc
         self.fc = fc
 
     def new_fc(self, hidden_size, nb_classes,device=None):

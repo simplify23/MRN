@@ -14,8 +14,23 @@ class Attention(nn.Module):
         self.hidden_size = hidden_size
         self.num_class = num_class
         self.generator = fc
+        self.num_char_embeddings = num_char_embeddings
         # self.generator = nn.Linear(hidden_size, num_class)
-        self.char_embeddings = nn.Embedding(num_class, num_char_embeddings)
+        # self.char_embeddings = nn.Embedding(num_class, num_char_embeddings)
+        self.char_embeddings = nn.Linear(1, num_char_embeddings)
+
+    def _char_to_onehot(self, input_char, onehot_dim=38):
+        input_char = input_char.unsqueeze(1)
+        batch_size = input_char.size(0)
+        one_hot = torch.FloatTensor(batch_size, self.num_char_embeddings).zero_().to(device)
+        one_hot = one_hot.scatter_(1, input_char, 1)
+        return one_hot
+
+    def minmax(self,a):
+        min_a = torch.min(a)
+        max_a = torch.max(a)
+        n2 = (a - min_a) / (max_a - min_a)
+        return n2
 
     def forward(self, batch_H, text, is_train=True, batch_max_length=25):
         """
@@ -36,10 +51,11 @@ class Attention(nn.Module):
             torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device),
             torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device),
         )
-
+        # text = self.minmax(text)
         if is_train:
             for i in range(num_steps):
-                char_embeddings = self.char_embeddings(text[:, i])
+                # char_onehots = self._char_to_onehot(text[:, i], onehot_dim=self.num_class)
+                char_embeddings = self.char_embeddings(text[:, i].unsqueeze(-1).float())
                 # hidden : decoder's hidden s_{t-1}, batch_H : encoder's hidden H, char_embeddings : f(y_{t-1})
                 hidden, alpha = self.attention_cell(hidden, batch_H, char_embeddings)
                 output_hiddens[:, i, :] = hidden[
@@ -56,7 +72,8 @@ class Attention(nn.Module):
             )
 
             for i in range(num_steps):
-                char_embeddings = self.char_embeddings(targets)
+                # char_onehots = self._char_to_onehot(targets, onehot_dim=self.num_class)
+                char_embeddings = self.char_embeddings(targets.unsqueeze(-1).float())
                 hidden, alpha = self.attention_cell(hidden, batch_H, char_embeddings)
                 probs_step = self.generator(hidden[0])
                 probs[:, i, :] = probs_step
