@@ -512,7 +512,7 @@ class Ensem(BaseLearner):
             score17,score19 = self.double_write(taski,task_accs)
             best_scores.append(score17)
             ned_scores.append(score19)
-            acc_log = f'Task {taski} Avg Incremental Acc:  17: {best_scores[taski]}    19: {ned_scores[taski]}\n Task {taski} 17 Acc: {task_accs}\n 19 Acc: {ned_accs}\n'
+            acc_log = f'Task {taski} Avg Incremental Acc:  17: {best_scores[taski]}    19: {ned_scores[taski]}\n Task {taski} 17 Acc: {score17}\n 19 Acc: {score19}\n'
             self.write_log(acc_log)
             print(acc_log)
         else:
