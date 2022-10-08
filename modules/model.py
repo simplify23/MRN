@@ -632,9 +632,9 @@ class Ensemble(nn.Module):
         self.fc = fc
     def build_prediction(self,opt,num_class):
         """Prediction"""
-        if opt.Prediction == "CTC":
+        if opt.Prediction == "CTC" or opt.Prediction == "Attn":
             # self.fc = nn.Linear(self.SequenceModeling_output, num_class)
-            self.Prediction = self.fc
+            # self.Prediction = self.fc
             self.model[-1].build_prediction(opt,num_class)
             # self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
         # elif opt.Prediction == "Attn":

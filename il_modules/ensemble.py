@@ -260,7 +260,7 @@ class Ensem(BaseLearner):
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
                 loss = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
             else:
-                preds = self.model(image, labels_index[:, :-1])['logits']  # align with Attention.forward
+                preds = self.model(image, cross,labels_index[:, :-1])['logits']  # align with Attention.forward
                 target = labels_index[:, 1:]  # without [SOS] Symbol
                 loss = self.criterion(
                     preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
@@ -355,7 +355,7 @@ class Ensem(BaseLearner):
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
                 loss_clf = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
             else:
-                output = self.model(image, labels_index[:, :-1])  # align with Attention.forward
+                output = self.model(image, True,labels_index[:, :-1])  # align with Attention.forward
                 preds = output["logits"]
                 aux_logits = output["aux_logits"]
                 aux_targets = labels_index.clone()[:, 1:]
