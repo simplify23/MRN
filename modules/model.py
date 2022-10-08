@@ -70,13 +70,17 @@ class Model_Extractor(nn.Module):
                         self.FeatureExtraction_output, opt.hidden_size, opt.hidden_size
                     ),
                     BidirectionalLSTM(
-                        opt.hidden_size, opt.hidden_size, opt.output_channel
+                        opt.hidden_size, opt.hidden_size, opt.hidden_size
                     ),
                 )
-                self.SequenceModeling_output = opt.output_channel
+                self.SequenceModeling_output = opt.hidden_size
             else:
+                self.SequenceModeling = nn.Sequential(
+                    nn.Linear(
+                        self.FeatureExtraction_output, opt.hidden_size)
+                )
                 print("No SequenceModeling module specified")
-                self.SequenceModeling_output = self.FeatureExtraction_output
+                self.SequenceModeling_output = opt.hidden_size
 
     def forward(self, image, SelfSL_layer=False):
         """Transformation stage"""
@@ -106,12 +110,15 @@ class Model_Extractor(nn.Module):
             return prediction_SelfSL
 
         """ Sequence modeling stage """
-        if self.stages["Seq"] == "BiLSTM":
-            contextual_feature = self.SequenceModeling(
-                visual_feature
-            )  # [b, num_steps, opt.hidden_size]
-        else:
-            contextual_feature = visual_feature# for convenience. this is NOT contextually modeled by BiLSTM
+        contextual_feature = self.SequenceModeling(
+            visual_feature
+        )  # [b, num_steps, opt.hidden_size]
+        # if self.stages["Seq"] == "BiLSTM":
+        #     contextual_feature = self.SequenceModeling(
+        #         visual_feature
+        #     )  # [b, num_steps, opt.hidden_size]
+        # else:
+        #     contextual_feature = visual_feature# for convenience. this is NOT contextually modeled by BiLSTM
 
         return contextual_feature  # [b, num_steps, opt.num_class]
 
