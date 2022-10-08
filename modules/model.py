@@ -333,7 +333,7 @@ class DERNet(Model):
             aux_logits = self.aux_Prediction(contextual_feature[:,:,-self.out_dim:].contiguous())
         else:
             aux_logits = self.aux_Prediction(
-                contextual_feature[:,-self.out_dim:].contiguous(),
+                contextual_feature[:,:,-self.out_dim:].contiguous(),
                 text,
                 is_train,
                 batch_max_length=self.opt.batch_max_length,
@@ -354,7 +354,7 @@ class DERNet(Model):
 
         if self.out_dim is None:
             self.out_dim=self.model[-1].SequenceModeling_output
-        fc = nn.Linear(self.feature_dim, nb_classes)
+        fc = nn.Linear(self.feature_dim if self.opt.Prediction=="CTC" else self.out_dim, nb_classes)
         if self.fc is not None:
             nb_output = self.fc.out_features
             weight = copy.deepcopy(self.fc.weight.data)
@@ -368,6 +368,21 @@ class DERNet(Model):
         # self.task_sizes.append(new_task_size)
 
         self.aux_fc= nn.Linear(self.out_dim,nb_classes)
+
+    def build_prediction(self,opt,num_class):
+        """Prediction"""
+        # print("build_prediction")
+        if opt.Prediction == "CTC":
+            # self.fc = nn.Linear(self.SequenceModeling_output, num_class)
+            self.Prediction = self.fc
+            # self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
+        elif opt.Prediction == "Attn":
+            # self.fc = nn.Linear(opt.hidden_size, num_class)
+            self.Prediction = Attention(
+                self.feature_dim, opt.hidden_size, num_class,self.fc
+            )
+        else:
+            raise Exception("Prediction is neither CTC or Attn")
 
     def build_aux_prediction(self,opt,num_class):
         """Prediction"""
