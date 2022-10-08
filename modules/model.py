@@ -10,7 +10,7 @@ from modules.transformation import TPS_SpatialTransformerNetwork
 from modules.feature_extraction import (
     VGG_FeatureExtractor,
     RCNN_FeatureExtractor,
-    ResNet_FeatureExtractor,
+    ResNet_FeatureExtractor, SVTR_FeatureExtractor,
 )
 from modules.sequence_modeling import BidirectionalLSTM
 from modules.prediction import Attention
@@ -49,6 +49,10 @@ class Model_Extractor(nn.Module):
             )
         elif opt.FeatureExtraction == "ResNet":
             self.FeatureExtraction = ResNet_FeatureExtractor(
+                opt.input_channel, opt.output_channel
+            )
+        elif opt.FeatureExtraction == "SVTR":
+            self.FeatureExtraction = SVTR_FeatureExtractor(
                 opt.input_channel, opt.output_channel
             )
         else:
@@ -194,6 +198,7 @@ class Model(nn.Module):
     def forward(self, image, text=None, is_train=True, SelfSL_layer=False):
         """Transformation stage"""
         contextual_feature = self.model(image)
+        # print(contextual_feature.size())
         # if not self.stages["Trans"] == "None":
         #     image = self.Transformation(image)
         #
@@ -411,7 +416,12 @@ class Ensemble(nn.Module):
         self.fc = None
         self.opt = opt
         self.task_sizes = []
-        self.patch = 63
+        if self.opt.FeatureExtraction == "VGG":
+            self.patch = 63
+        elif self.opt.FeatureExtraction == "SVTR":
+            self.patch = 64
+        elif self.opt.FeatureExtraction == "ResNet":
+            self.patch = 65
         self.mlp = "vip"
         self.layer_num = 3
         self.beta = 5
