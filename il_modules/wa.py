@@ -80,8 +80,8 @@ class WA(BaseLearner):
                 loss_clf = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
             else:
                 start_index = 1
-                preds = self.model(image, labels_index[:, :-1])["predict"]  # align with Attention.forward
-                old_preds = self._old_network(image, labels_index[:, :-1])["predict"]
+                preds = self.model(image, labels_index[:, :-1],True)["predict"]  # align with Attention.forward
+                old_preds = self._old_network(image, labels_index[:, :-1],False)["predict"]
                 target = labels_index[:, 1:]  # without [SOS] Symbol
                 loss_clf = self.criterion(
                     preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)

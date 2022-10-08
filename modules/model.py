@@ -364,11 +364,10 @@ class DERNet(Model):
 
         del self.fc
         self.fc = fc
+        # new_task_size = nb_classes - sum(self.task_sizes)
+        # self.task_sizes.append(new_task_size)
 
-        new_task_size = nb_classes - sum(self.task_sizes)
-        self.task_sizes.append(new_task_size)
-
-        self.aux_fc= nn.Linear(self.out_dim,new_task_size+1)
+        self.aux_fc= nn.Linear(self.out_dim,nb_classes)
 
     def build_aux_prediction(self,opt,num_class):
         """Prediction"""
@@ -417,13 +416,13 @@ class Ensemble(nn.Module):
         """Transformation stage"""
         # features = [convnet(image) for convnet in self.model]
         if cross==False:
-            features = self.model[-1](image)["predict"]
+            features = self.model[-1](image,text,is_train)["predict"]
             index = None
         # elif is_train == False:
         #     features, index = self.cross_test(image)
         else:
             # features,index = self.cross_forwardv2(image)
-            features, index = self.cross_forward_dim3(image)
+            features, index = self.cross_forward_dim3(image,text,is_train)
         # out=self.fc(features) #{logics: self.fc(features)}
         out = dict({"logits":features,"index":index,"aux_logits":None})
 
@@ -434,56 +433,8 @@ class Ensemble(nn.Module):
         zero = torch.ones([B,T,total-know],dtype=torch.float).to(feature.device)
         return torch.cat([feature,zero],dim=-1)
 
-    def max_forward(self, image, text=None, is_train=True, SelfSL_layer=False):
-        """Transformation stage"""
-        features = [convnet(image)for convnet in self.model]
-        route_info = torch.stack([torch.mean(torch.max(feature["predict"],-1)[0],-1) for feature in features],-1)
-        # route_info = self.gmlp(route_info)
-        indexs = torch.argmax(route_info, dim=-1)
-
-        features = [feature["predict"] for feature in features]
-        B,T,C = features[-1].size()
-        list_len = len(features)
-        normal_feat = []
-        for i in range(list_len-1):
-            feat = self.pad_zeros_features(features[i],total=C)
-            normal_feat.append(feat)
-        normal_feat.append(features[-1])
-        features = torch.stack(normal_feat,0)
-        output = torch.stack([features[index][i] for i,index in enumerate(indexs)],0)
-        return output.contiguous()
-
     def cross_test(self, image, text=None, is_train=False, SelfSL_layer=False):
         return self.cross_forward(image, text=None, is_train=False, SelfSL_layer=False)
-
-    def cross_forwardv2(self, image, text=None, is_train=True, SelfSL_layer=False):
-        """Transformation stage"""
-        features = [convnet(image)for convnet in self.model]
-        route_info = torch.cat([feature["feature"] for feature in features],-1)
-        route_info = self.gmlp(route_info)
-        route_info = self.channel_route(route_info).permute(0,2,1)
-        # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
-        index = self.route(route_info.contiguous())
-        index = self.softargmax1d(torch.squeeze(index,-1))
-        # index [B,I]
-        # index = torch.max(torch.squeeze(index,-1),-1)[1]
-        # index = torch.mean(torch.squeeze(index, -1), -1)
-        # index = torch.squeeze(index,-1)
-
-        # feature_array = torch.stack(features, 1)
-        features = [feature["predict"] for feature in features]
-        B,T,C = features[-1].size()
-        list_len = len(features)
-        normal_feat = []
-        for i in range(list_len-1):
-            feat = self.pad_zeros_features(features[i],total=C)
-            normal_feat.append(feat)
-        normal_feat.append(features[-1])
-        normal_feat = torch.stack(normal_feat,0)
-        # normal_feat [I,B,T,C] -> [T,C,B,I] -> [B,T,C,I]
-        output = (normal_feat.permute(2,3,1,0) * index).permute(2,0,1,3).contiguous()
-
-        return torch.sum(output,-1),index
 
     def cross_forward(self, image, text=None, is_train=True, SelfSL_layer=False):
         """Transformation stage"""
@@ -515,38 +466,9 @@ class Ensemble(nn.Module):
         # return out  # [b, num_steps, opt.num_class]
         return output.contiguous(),index
 
-    def cross_forwardv3(self, image, text=None, is_train=True, SelfSL_layer=False):
-        """Transformation stage"""
-        features = [convnet(image)for convnet in self.model]
-        route_info = torch.cat([feature["feature"] for feature in features],0)
-        # I, B, T, C
-        route_info = self.normal_fc(route_info)
-        route_info = self.gmlp(route_info)
-        route_info = self.channel_route(route_info)
-        # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
-        # index = self.route(route_info.contiguous())
-        index = self.softargmax1d(torch.squeeze(route_info,-1),1)
-        # route_info [B,T,I]
-        # index = torch.squeeze(route_info,-1)
-
-        # feature_array = torch.stack(features, 1)
-        features = [feature["predict"] for feature in features]
-        B,T,C = features[-1].size()
-        list_len = len(features)
-        normal_feat = []
-        for i in range(list_len-1):
-            feat = self.pad_zeros_features(features[i],total=C)
-            normal_feat.append(feat)
-        normal_feat.append(features[-1])
-        normal_feat = torch.stack(normal_feat,0)
-        # normal_feat [I,B,T,C] -> [C,B,T,I] -> [B,T,C,I]
-        output = (normal_feat.permute(3,1,2,0).contiguous() * route_info).permute(1,2,0,3).contiguous()
-
-        return torch.sum(output,-1),index
-
     def cross_forward_dim3(self, image, text=None, is_train=True, SelfSL_layer=False):
         """Transformation stage"""
-        features = [convnet(image) for convnet in self.model]
+        features = [convnet(image,text,is_train) for convnet in self.model]
         route_info = torch.stack([feature["feature"] for feature in features], 1)
         route_info = self.mlp3d(route_info)
         route_info = rearrange(route_info, 'b h w c -> b w (h c)')
@@ -572,6 +494,36 @@ class Ensemble(nn.Module):
         # output = (normal_feat.permute(3,1,2,0) * route_info).permute(1,2,0,3).contiguous()
 
         return torch.sum(output, -1), index
+
+
+    def cross_forwardv2(self, image, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        features = [convnet(image)for convnet in self.model]
+        route_info = torch.cat([feature["feature"] for feature in features],-1)
+        route_info = self.gmlp(route_info)
+        route_info = self.channel_route(route_info).permute(0,2,1)
+        # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
+        index = self.route(route_info.contiguous())
+        index = self.softargmax1d(torch.squeeze(index,-1))
+        # index [B,I]
+        # index = torch.max(torch.squeeze(index,-1),-1)[1]
+        # index = torch.mean(torch.squeeze(index, -1), -1)
+        # index = torch.squeeze(index,-1)
+
+        # feature_array = torch.stack(features, 1)
+        features = [feature["predict"] for feature in features]
+        B,T,C = features[-1].size()
+        list_len = len(features)
+        normal_feat = []
+        for i in range(list_len-1):
+            feat = self.pad_zeros_features(features[i],total=C)
+            normal_feat.append(feat)
+        normal_feat.append(features[-1])
+        normal_feat = torch.stack(normal_feat,0)
+        # normal_feat [I,B,T,C] -> [T,C,B,I] -> [B,T,C,I]
+        output = (normal_feat.permute(2,3,1,0) * index).permute(2,0,1,3).contiguous()
+
+        return torch.sum(output,-1),index
 
     def build_fc(self, hidden_size, nb_classes,device=None):
         self.update_fc(hidden_size, nb_classes,device=None)
@@ -658,6 +610,55 @@ class Ensemble(nn.Module):
         # result = torch.sum((n - 1) * input * indices, dim=-1)
 
         return nn.functional.softmax(beta * input, dim=-1)
+
+
+    def cross_forwardv3(self, image, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        features = [convnet(image)for convnet in self.model]
+        route_info = torch.cat([feature["feature"] for feature in features],0)
+        # I, B, T, C
+        route_info = self.normal_fc(route_info)
+        route_info = self.gmlp(route_info)
+        route_info = self.channel_route(route_info)
+        # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
+        # index = self.route(route_info.contiguous())
+        index = self.softargmax1d(torch.squeeze(route_info,-1),1)
+        # route_info [B,T,I]
+        # index = torch.squeeze(route_info,-1)
+
+        # feature_array = torch.stack(features, 1)
+        features = [feature["predict"] for feature in features]
+        B,T,C = features[-1].size()
+        list_len = len(features)
+        normal_feat = []
+        for i in range(list_len-1):
+            feat = self.pad_zeros_features(features[i],total=C)
+            normal_feat.append(feat)
+        normal_feat.append(features[-1])
+        normal_feat = torch.stack(normal_feat,0)
+        # normal_feat [I,B,T,C] -> [C,B,T,I] -> [B,T,C,I]
+        output = (normal_feat.permute(3,1,2,0).contiguous() * route_info).permute(1,2,0,3).contiguous()
+
+        return torch.sum(output,-1),index
+
+    def max_forward(self, image, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        features = [convnet(image)for convnet in self.model]
+        route_info = torch.stack([torch.mean(torch.max(feature["predict"],-1)[0],-1) for feature in features],-1)
+        # route_info = self.gmlp(route_info)
+        indexs = torch.argmax(route_info, dim=-1)
+
+        features = [feature["predict"] for feature in features]
+        B,T,C = features[-1].size()
+        list_len = len(features)
+        normal_feat = []
+        for i in range(list_len-1):
+            feat = self.pad_zeros_features(features[i],total=C)
+            normal_feat.append(feat)
+        normal_feat.append(features[-1])
+        features = torch.stack(normal_feat,0)
+        output = torch.stack([features[index][i] for i,index in enumerate(indexs)],0)
+        return output.contiguous()
 
     # def freeze(self):
     #     for param in self.parameters():

@@ -220,8 +220,8 @@ class DER(BaseLearner):
                 preds = output["logits"]
                 aux_logits = output["aux_logits"]
                 aux_targets = labels_index.clone()
-                aux_targets = torch.where(aux_targets - self._known_classes + 1 > 0,
-                                          aux_targets - self._known_classes + 1, 0)
+                # aux_targets = torch.where(aux_targets - self._known_classes + 1 > 0,
+                #                           aux_targets - self._known_classes + 1, 0)
 
                 aux_preds_size = torch.IntTensor([aux_logits.size(1)] * batch_size)
                 preds_size = torch.IntTensor([preds.size(1)] * batch_size)
