@@ -71,6 +71,7 @@ class WA(BaseLearner):
 
             # default recognition loss part
             if "CTC" in self.opt.Prediction:
+                start_index = 0
                 preds = self.model(image)["predict"]
                 old_preds = self._old_network(image)["predict"]
                 preds_size = torch.IntTensor([preds.size(1)] * batch_size)
@@ -78,6 +79,7 @@ class WA(BaseLearner):
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
                 loss_clf = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
             else:
+                start_index = 1
                 preds = self.model(image, labels_index[:, :-1])["predict"]  # align with Attention.forward
                 old_preds = self._old_network(image, labels_index[:, :-1])["predict"]
                 target = labels_index[:, 1:]  # without [SOS] Symbol
@@ -90,8 +92,8 @@ class WA(BaseLearner):
             #     preds_log_softmax[:, self._known_classes:], fake_targets
             # )
             loss_kd = _KD_loss(
-                preds.view(-1, preds.shape[-1])[:, 1: self._known_classes],
-                old_preds.view(-1, old_preds.shape[-1])[:, 1: self._known_classes],
+                preds.view(-1, preds.shape[-1])[:, start_index: self._known_classes],
+                old_preds.view(-1, old_preds.shape[-1])[:, start_index: self._known_classes],
                 T,
             )
 
