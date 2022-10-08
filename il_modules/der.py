@@ -53,7 +53,8 @@ class DER(BaseLearner):
     def change_model(self,):
         """ model configuration """
         # model.module.reset_class(opt, device)
-        self.model.update_fc(self.opt.hidden_size, self._total_classes)
+        self.model.update_fc(self.opt.output_channel, self._total_classes)
+        # self.model.update_fc(self.opt.hidden_size, self._total_classes)
         self.model.build_prediction(self.opt, self._total_classes)
         self.model.build_aux_prediction(self.opt, self._total_classes)
         # reset_class(self.model.module, self.device)
@@ -64,8 +65,8 @@ class DER(BaseLearner):
 
     def build_model(self):
         """ model configuration """
-
-        self.model.update_fc(self.opt.hidden_size, self._total_classes)
+        self.model.update_fc(self.opt.output_channel, self._total_classes)
+        # self.model.update_fc(self.opt.hidden_size, self._total_classes)
         self.model.build_prediction(self.opt, self._total_classes)
         self.model.build_aux_prediction(self.opt, self._total_classes)
 

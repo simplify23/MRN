@@ -536,7 +536,7 @@ class Attention(nn.Module):
         q, k, v = qkv[0] * self.scale, qkv[1], qkv[2]
         attn = (q.matmul(k.permute(0, 1, 3, 2)))
         if self.mixer == 'Local':
-            attn += self.mask
+            attn += self.mask.to(attn.device)
         attn = nn.functional.softmax(attn, dim=-1)
         attn = self.attn_drop(attn)
 
@@ -857,7 +857,7 @@ class SVTRNet(nn.Module):
         if patch_merging is not None:
             self.sub_sample3 = SubSample(
                 embed_dim[2],
-                embed_dim[2],
+                self.out_channels,
                 sub_norm=sub_norm,
                 stride=[2, 1],
                 types=patch_merging)
@@ -922,7 +922,7 @@ class SVTRNet(nn.Module):
             x = self.sub_sample3(
                 x.permute(0, 2, 1).reshape(
                     [-1, self.embed_dim[2], self.HW[0] // 4, self.HW[1]]))
-        x = x.permute(0, 2, 1).reshape([-1, self.embed_dim[2], self.HW[0] // 8, self.HW[1]])
+        x = x.permute(0, 2, 1).reshape([-1, self.out_channels , self.HW[0] // 8, self.HW[1]])
         if not self.prenorm:
             x = self.norm(x)
         return x

@@ -16,7 +16,7 @@ from torch.autograd import Variable
 from data.dataset import hierarchical_dataset
 from il_modules.base import BaseLearner
 from il_modules.der import DER
-from modules.model import DERNet, Ensemble, Ensemblev2
+from modules.model import DERNet, Ensemble
 from test import validation
 from tools.utils import Averager, adjust_learning_rate
 
@@ -107,7 +107,8 @@ class Ensem(BaseLearner):
         # model.module.reset_class(opt, device)
         if isinstance(self.model, torch.nn.DataParallel):
             self.model = self.model.module
-        self.model.update_fc(self.opt.hidden_size, self._total_classes)
+        # self.model.update_fc(self.opt.hidden_size, self._total_classes)
+        self.model.update_fc(self.opt.output_channel, self._total_classes)
         self.model.build_prediction(self.opt, self._total_classes)
         # reset_class(self.model.module, self.device)
         # data parallel for multi-GPU
@@ -118,7 +119,8 @@ class Ensem(BaseLearner):
     def build_model(self):
         """ model configuration """
 
-        self.model.build_fc(self.opt.hidden_size, self._total_classes)
+        # self.model.build_fc(self.opt.hidden_size, self._total_classes)
+        self.model.build_fc(self.opt.output_channel, self._total_classes)
         self.model.build_prediction(self.opt, self._total_classes)
 
         # weight initialization
