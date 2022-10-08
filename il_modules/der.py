@@ -102,6 +102,8 @@ class DER(BaseLearner):
             self.criterion = self.build_criterion()
             self.build_model()
 
+        # print opt config
+        # self.print_config(self.opt)
         if taski > 0:
             for i in range(taski):
                 for p in self.model.module.model[i].parameters():
@@ -113,8 +115,31 @@ class DER(BaseLearner):
         # setup optimizer
         self.build_optimizer(filtered_parameters)
 
-        """ start training """
-        self._train(0, taski, train_loader, valid_loader)
+        if self.opt.start_task > taski:
+
+            if taski > 0:
+                if self.opt.memory != None:
+                    self.build_rehearsal_memory(train_loader, taski)
+                else:
+                    train_loader.get_dataset(taski, memory=self.opt.memory)
+
+            if self.opt.ch_list!=None:
+                name = self.opt.ch_list[taski]
+            else:
+                name = self.opt.lan_list[taski]
+            saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_best_score.pth"
+            # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
+            self.model.load_state_dict(torch.load(f"{saved_best_model}"), strict=True)
+            print(
+            'Task {} load checkpoint from {}.'.format(taski, saved_best_model)
+            )
+
+        else:
+            print(
+            'Task {} start training for model ------{}------'.format(taski,self.opt.exp_name)
+            )
+            """ start training """
+            self._train(0, taski, train_loader, valid_loader)
 
 
     def _train(self, start_iter,taski, train_loader, valid_loader):

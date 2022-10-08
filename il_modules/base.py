@@ -211,10 +211,9 @@ class BaseLearner(object):
             'Task {} start training for model ------{}------'.format(taski,self.opt.exp_name)
             )
 
-        """ start training """
-        start_iter = 0
-
-        self._train(start_iter,taski, train_loader, valid_loader)
+            """ start training """
+            start_iter = 0
+            self._train(start_iter,taski, train_loader, valid_loader)
 
     def _train(self, start_iter,taski, train_loader, valid_loader):
         if taski == 0:
