@@ -9,6 +9,9 @@ from functools import partial
 # from mmcv.cnn import ConvModule
 from einops import rearrange
 
+from modules.svtr import SVTR2
+
+
 class VGG_FeatureExtractor(nn.Module):
     """FeatureExtractor of CRNN (https://arxiv.org/pdf/1507.05717.pdf)"""
 
@@ -615,7 +618,7 @@ class Block(nn.Module):
 class PatchEmbed(nn.Module):
 
     def __init__(self,
-                 img_size=[32, 100],
+                 img_size=[32, 256],
                  in_channels=3,
                  embed_dim=768,
                  sub_num=2):
@@ -952,7 +955,8 @@ class SVTR_FeatureExtractor(nn.Module):
 
     def __init__(self, input_channel, output_channel=512):
         super(SVTR_FeatureExtractor, self).__init__()
-        self.ConvNet = SVTRNet(in_channels=input_channel, out_channels=output_channel)
+        # self.ConvNet = SVTRNet(in_channels=input_channel, out_channels=output_channel)
+        self.ConvNet = SVTR2(in_channels=input_channel, out_channels=output_channel)
         # self.neck = Im2Seq()
 
     def forward(self, input):
