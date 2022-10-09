@@ -194,7 +194,7 @@ def validation(model, criterion, eval_loader, converter, opt, val_choose="val",t
             elif val_choose == "TF":
                 preds = model(image,cross = True, text = text_for_pred, is_train = False)
             else:
-                preds = model(image, text_for_pred, is_train=False)
+                preds = model(image, text = text_for_pred, is_train=False)
             if len(preds) == 3:
                 preds = preds['logits']
             elif len(preds) == 2:
