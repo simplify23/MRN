@@ -228,7 +228,7 @@ class WeightedPermuteMLP(nn.Module):
         return x
 
 class WeightedPermuteMLPv3(nn.Module):
-    def __init__(self, dim, segment_dim=8, qkv_bias=False, taski=1,patch=63, proj_drop=0.,mlp="taski"):
+    def __init__(self, dim, segment_dim=8, qkv_bias=False, taski=1,patch=63, proj_drop=0.,mlp="patch"):
         super().__init__()
         self.segment_dim = segment_dim
         self.mlp = mlp
@@ -242,9 +242,13 @@ class WeightedPermuteMLPv3(nn.Module):
                                    )
         else:
             self.mlp_h = SpatialGatingUnit(dim, taski)
+            self.up_mlp = nn.Linear(dim // 2, dim, bias=qkv_bias)
 
         if self.mlp == "patch":
-            self.mlp_w = SpatialGatingUnit(dim,patch)
+            self.mlp_w = nn.Sequential(
+                    SpatialGatingUnit(dim,patch),
+                    nn.Linear(dim // 2, dim, bias=qkv_bias),
+                                       )
         else:
             self.mlp_w = nn.Sequential(
                         nn.Linear(patch, dim, bias=qkv_bias),
@@ -263,14 +267,16 @@ class WeightedPermuteMLPv3(nn.Module):
             h = x.permute(0,3,2,1)
             h = self.mlp_h(h).permute(0, 3, 2 , 1)
         else:
-            h = self.mlp_h(x)
+            h = self.mlp_h(x.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)
+            h = self.up_mlp(h)
 
         # B,C, H,W -> B,H,W,C
         if self.mlp != "patch":
             w = x.permute(0, 3, 1, 2)
             w = self.mlp_w(w).permute(0, 2, 3, 1)
         else:
-            w = self.mlp_w(x.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)
+            w = self.mlp_w(x)
+
 
         c = self.mlp_c(x)
         # B, C, H, W -> B, C,[ H, W ]
