@@ -430,8 +430,8 @@ class Ensemble(nn.Module):
         elif self.opt.FeatureExtraction == "ResNet":
             self.patch = 65
         self.mlp = "vip"
-        self.layer_num = 3
-        self.beta = 5
+        self.layer_num = 1
+        self.beta = 1
 
     @property
     def feature_dim(self):

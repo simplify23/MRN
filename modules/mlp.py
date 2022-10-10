@@ -23,6 +23,7 @@ from torchvision.ops.deform_conv import deform_conv2d as deform_conv2d_tv
 #     'cycle_M': _cfg(crop_pct=0.9),
 #     'cycle_L': _cfg(crop_pct=0.875),
 # }
+from modules.block import SpatialGatingUnit
 
 
 class Mlp(nn.Module):
@@ -226,6 +227,63 @@ class WeightedPermuteMLP(nn.Module):
 
         return x
 
+class WeightedPermuteMLPv3(nn.Module):
+    def __init__(self, dim, segment_dim=8, qkv_bias=False, taski=1,patch=63, proj_drop=0.,mlp="taski"):
+        super().__init__()
+        self.segment_dim = segment_dim
+        self.mlp = mlp
+        self.mlp_c = nn.Sequential(
+                    nn.Linear(dim, dim, bias=qkv_bias),
+                                   )
+        if self.mlp != "taski":
+            self.mlp_h = nn.Sequential(
+                    nn.Linear(taski, dim, bias=qkv_bias),
+                    nn.Linear(dim, taski, bias=qkv_bias),
+                                   )
+        else:
+            self.mlp_h = SpatialGatingUnit(dim, taski)
+
+        if self.mlp == "patch":
+            self.mlp_w = SpatialGatingUnit(dim,patch)
+        else:
+            self.mlp_w = nn.Sequential(
+                        nn.Linear(patch, dim, bias=qkv_bias),
+                        nn.Linear(dim, patch, bias=qkv_bias),
+                                   )
+        self.reweight = Mlp(dim, dim // 4, dim * 3)
+
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+    def forward(self, x):
+        B, H, W, C = x.shape
+        # print(x.shape)
+
+        if self.mlp != "taski":
+            h = x.permute(0,3,2,1)
+            h = self.mlp_h(h).permute(0, 3, 2 , 1)
+        else:
+            h = self.mlp_h(x)
+
+        # B,C, H,W -> B,H,W,C
+        if self.mlp != "patch":
+            w = x.permute(0, 3, 1, 2)
+            w = self.mlp_w(w).permute(0, 2, 3, 1)
+        else:
+            w = self.mlp_w(x.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)
+
+        c = self.mlp_c(x)
+        # B, C, H, W -> B, C,[ H, W ]
+        a = (h + w + c).permute(0, 3, 1, 2).flatten(2).mean(2)
+        a = self.reweight(a).reshape(B, C, 3).permute(2, 0, 1).softmax(dim=0).unsqueeze(2).unsqueeze(2)
+
+        x = h * a[0] + w * a[1] + c * a[2]
+
+        x = self.proj(x)
+        x = self.proj_drop(x)
+
+        return x
+
 class WeightedPermuteMLPv2(nn.Module):
     def __init__(self, dim, segment_dim=8, qkv_bias=False, taski=1,patch=63, proj_drop=0.):
         super().__init__()
@@ -279,7 +337,7 @@ class WeightedPermuteMLPv2(nn.Module):
 class PermutatorBlock(nn.Module):
 
     def __init__(self, dim, mlp_ratio=4., taski = 1, patch = 63, segment_dim=8, qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, skip_lam=1.0, mlp_fn=WeightedPermuteMLPv2):
+                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, skip_lam=1.0, mlp_fn=WeightedPermuteMLPv3):
         super().__init__()
         self.norm1 = norm_layer(dim)
         self.attn = mlp_fn(dim, segment_dim=segment_dim, taski=taski,patch=patch,qkv_bias=qkv_bias)

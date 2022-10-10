@@ -307,7 +307,7 @@ class Ensem(BaseLearner):
         self.model.module.model[-1].eval()
 
 
-    def _update_representation(self,start_iter, taski, train_loader, valid_loader,pi=10):
+    def _update_representation(self,start_iter, taski, train_loader, valid_loader,pi=15):
         # loss averager
         train_loss_avg = Averager()
 
