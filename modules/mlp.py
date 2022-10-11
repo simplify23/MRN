@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from einops import rearrange
 
 from timm.models.layers import DropPath
 
@@ -228,7 +229,7 @@ class WeightedPermuteMLP(nn.Module):
         return x
 
 class WeightedPermuteMLPv3(nn.Module):
-    def __init__(self, dim, segment_dim=8, qkv_bias=False, taski=1,patch=63, proj_drop=0.,mlp="patch"):
+    def __init__(self, dim, segment_dim=8, qkv_bias=False, taski=1,patch=63, proj_drop=0.,mlp="None"):
         super().__init__()
         self.segment_dim = segment_dim
         self.mlp = mlp
@@ -237,8 +238,8 @@ class WeightedPermuteMLPv3(nn.Module):
                                    )
         if self.mlp != "taski":
             self.mlp_h = nn.Sequential(
-                    nn.Linear(taski, dim, bias=qkv_bias),
-                    nn.Linear(dim, taski, bias=qkv_bias),
+                    nn.Linear(taski * 64, taski * 64, bias=qkv_bias),
+                    # nn.Linear(dim, taski, bias=qkv_bias),
                                    )
         else:
             self.mlp_h = SpatialGatingUnit(dim, taski)
@@ -251,8 +252,8 @@ class WeightedPermuteMLPv3(nn.Module):
                                        )
         else:
             self.mlp_w = nn.Sequential(
-                        nn.Linear(patch, dim, bias=qkv_bias),
-                        nn.Linear(dim, patch, bias=qkv_bias),
+                        nn.Linear(int(patch * dim // 64), int(patch * dim // 64), bias=qkv_bias),
+                        # nn.Linear(dim, patch, bias=qkv_bias),
                                    )
         self.reweight = Mlp(dim, dim // 4, dim * 3)
 
@@ -264,16 +265,20 @@ class WeightedPermuteMLPv3(nn.Module):
         # print(x.shape)
 
         if self.mlp != "taski":
-            h = x.permute(0,3,2,1)
-            h = self.mlp_h(h).permute(0, 3, 2 , 1)
+            h = rearrange(x,'b i t (h k) -> b t k (i h)',h=64)
+            h = self.mlp_h(h)
+            h = rearrange(h,'b t k (i h) -> b i t (h k)',h=64)
         else:
             h = self.mlp_h(x.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)
             h = self.up_mlp(h)
 
         # B,C, H,W -> B,H,W,C
         if self.mlp != "patch":
-            w = x.permute(0, 3, 1, 2)
-            w = self.mlp_w(w).permute(0, 2, 3, 1)
+            w = rearrange(x,'b i t (h k) -> b i h (t k)',k = 4)
+            w = self.mlp_w(w)
+            w = rearrange(w,'b i h (t k) -> b i t (h k)',k = 4)
+            # w = x.permute(0, 3, 1, 2)
+            # w = self.mlp_w(w).permute(0, 2, 3, 1)
         else:
             w = self.mlp_w(x)
 

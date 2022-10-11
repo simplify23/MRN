@@ -454,7 +454,7 @@ class Ensemble(nn.Module):
         #     features, index = self.cross_test(image)
         else:
             # features,index = self.cross_forwardv2(image)
-            features, index = self.cross_forward_dim3(image,text,is_train)
+            features, index = self.cross_forward_dim4(image,text,is_train)
         # out=self.fc(features) #{logics: self.fc(features)}
         out = dict({"logits":features,"index":index,"aux_logits":None})
 
@@ -497,6 +497,35 @@ class Ensemble(nn.Module):
         #
         # return out  # [b, num_steps, opt.num_class]
         return output.contiguous(),index
+
+    def cross_forward_dim4(self, image, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        features = [convnet(image,text,is_train) for convnet in self.model]
+        route_info = torch.stack([feature["feature"] for feature in features], 1)
+        route_info = self.mlp3d(route_info)
+        route_info = rearrange(route_info,'b i t (h k) -> b i h (t k)',h=64)
+        route_info = self.route(route_info).mean(-1)
+        route_info = rearrange(route_info, 'b i h -> b (i h)')
+        index = self.channel_route(route_info).softmax(dim=-1)
+
+        # index [B,I]
+        # route_info [B,T,I]
+
+        # feature_array = torch.stack(features, 1)
+        features = [feature["predict"] for feature in features]
+        B, T, C = features[-1].size()
+        list_len = len(features)
+        normal_feat = []
+        for i in range(list_len - 1):
+            feat = self.pad_zeros_features(features[i], total=C)
+            normal_feat.append(feat)
+        normal_feat.append(features[-1])
+        normal_feat = torch.stack(normal_feat, 0)
+        # normal_feat [I,B,T,C] -> [T,C,B,I] -> [B,T,C,I]
+        output = (normal_feat.permute(2, 3, 1, 0) * index).permute(2, 0, 1, 3).contiguous()
+        # output = (normal_feat.permute(3,1,2,0) * route_info).permute(1,2,0,3).contiguous()
+
+        return torch.sum(output, -1), index
 
     def cross_forward_dim3(self, image, text=None, is_train=True, SelfSL_layer=False):
         """Transformation stage"""
@@ -568,8 +597,14 @@ class Ensemble(nn.Module):
         if self.out_dim is None:
             self.out_dim=self.model[-1].SequenceModeling_output
         # self.route = nn.Linear(self.patch * len(self.model), len(self.model))
-        self.route = nn.Linear(self.patch , 1)
-        self.channel_route = nn.Linear(self.feature_dim, len(self.model))
+        patch_hidden = int(self.patch * self.out_dim // 64)
+        self.route = nn.Linear(patch_hidden,patch_hidden)
+        self.channel_route = nn.Linear(len(self.model)*64,len(self.model))
+
+
+        # # self.route = nn.Linear(self.patch , 1)
+        # self.channel_route = nn.Linear(self.feature_dim, len(self.model))
+
         # self.gmlp = GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
         # self.gmlp = nn.Sequential(
         #     GatingMlpBlock(self.feature_dim,self.feature_dim//len(self.model),self.patch),
