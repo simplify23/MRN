@@ -3,8 +3,8 @@ import copy
 import torch
 from einops import rearrange
 import torch.nn as nn
-
-from modules.block import GatingMlpBlock, GatingMlpBlockv2
+import torch.nn.functional as F
+from modules.block import GatingMlpBlock
 from modules.mlp import PermutatorBlock, CycleMLP
 from modules.transformation import TPS_SpatialTransformerNetwork
 from modules.feature_extraction import (
@@ -429,7 +429,7 @@ class Ensemble(nn.Module):
             self.patch = 64
         elif self.opt.FeatureExtraction == "ResNet":
             self.patch = 65
-        self.mlp = "vip"  #gmlp | vip | gmlpv2 |
+        self.mlp = "vip"
         self.layer_num = 1
         self.beta = 1
 
@@ -476,8 +476,8 @@ class Ensemble(nn.Module):
         route_info = self.channel_route(route_info).permute(0,2,1)
         # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
         index = self.route(route_info.contiguous())
-        index = self.softargmax1d(torch.squeeze(index, -1))
-        index = torch.max(index,-1)[1]
+        # index = self.softargmax1d(torch.squeeze(index, -1))
+        index = torch.max(torch.squeeze(index, -1),-1)[1]
         # index = torch.mean(torch.squeeze(index, -1), -1)
 
         # feature_array = torch.stack(features, 1)
@@ -504,9 +504,13 @@ class Ensemble(nn.Module):
         route_info = torch.stack([feature["feature"] for feature in features], 1)
         route_info = self.mlp3d(route_info)
         route_info = rearrange(route_info,'b i t (h k) -> b i h (t k)',h=64)
-        route_info = self.route(route_info).mean(-1)
+
+        route_score = F.sigmoid(self.route_s(route_info))
+        route_info = (self.route(route_info) * route_score).mean(-1)
         route_info = rearrange(route_info, 'b i h -> b (i h)')
-        index = self.channel_route(route_info).softmax(dim=-1)
+
+        route_score = F.sigmoid(self.channel_route_s(route_info))
+        index = (self.channel_route(route_info) * route_score).softmax(dim=-1)
 
         # index [B,I]
         # route_info [B,T,I]
@@ -601,6 +605,9 @@ class Ensemble(nn.Module):
         self.route = nn.Linear(patch_hidden,patch_hidden)
         self.channel_route = nn.Linear(len(self.model)*64,len(self.model))
 
+        self.route_s = nn.Linear(patch_hidden,patch_hidden)
+        self.channel_route_s = nn.Linear(len(self.model)*64,len(self.model))
+
 
         # # self.route = nn.Linear(self.patch , 1)
         # self.channel_route = nn.Linear(self.feature_dim, len(self.model))
@@ -615,8 +622,6 @@ class Ensemble(nn.Module):
             block = GatingMlpBlock(self.out_dim, self.out_dim * 2, self.patch)
         elif self.mlp == "vip":
             block = PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch)
-        elif self.mlp == "gmlpv2":
-            block = GatingMlpBlockv2(self.out_dim, self.out_dim * 2, self.patch,len(self.model))
         else:
             block = nn.Linear(self.out_dim, self.out_dim )
         layers=[]
