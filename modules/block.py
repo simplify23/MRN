@@ -39,12 +39,39 @@ class GatingMlpBlock(nn.Module):
     def forward(self, x):
         # if self.training and torch.equal(self.m.sample(), torch.zeros(1)):
         #     return x
+
         shorcut = x.clone()
         x = self.norm(x)
         x = self.proj_1(x)
         x = self.activation(x)
         x = self.spatial_gating_unit(x)
         x = self.proj_2(x)
+        return x + shorcut
+
+class GatingMlpBlockv2(nn.Module):
+    def __init__(self, d_model, d_ffn, seq_len,taski):
+        super().__init__()
+
+        self.norm = nn.LayerNorm(d_model)
+        self.proj_1 = nn.Linear(d_model, d_ffn)
+        self.activation = nn.GELU()
+        self.spatial_gating_unit = SpatialGatingUnit(d_ffn, seq_len)
+        self.spatial_gating_unit2 = SpatialGatingUnit(d_model, taski)
+        self.proj_2 = nn.Linear(d_ffn // 2, d_model)
+        self.proj_3 = nn.Linear(d_model // 2, d_model)
+    def forward(self, x):
+        # if self.training and torch.equal(self.m.sample(), torch.zeros(1)):
+        #     return x
+        # B, H, W, C = x.shape
+        shorcut = x.clone()
+        x = self.norm(x)
+        x = self.proj_1(x)
+        x = self.activation(x)
+        x = self.spatial_gating_unit(x)
+        x = self.proj_2(x)
+        x = x + shorcut
+        x = self.spatial_gating_unit2(x.permute(0,2,1,3)).permute(0,2,1,3)
+        x = self.proj_3(x)
         return x + shorcut
 
 class ChannelAttentionModule(nn.Module):

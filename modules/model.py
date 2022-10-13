@@ -4,7 +4,7 @@ import torch
 from einops import rearrange
 import torch.nn as nn
 
-from modules.block import GatingMlpBlock
+from modules.block import GatingMlpBlock, GatingMlpBlockv2
 from modules.mlp import PermutatorBlock, CycleMLP
 from modules.transformation import TPS_SpatialTransformerNetwork
 from modules.feature_extraction import (
@@ -429,7 +429,7 @@ class Ensemble(nn.Module):
             self.patch = 64
         elif self.opt.FeatureExtraction == "ResNet":
             self.patch = 65
-        self.mlp = "vip"
+        self.mlp = "vip"  #gmlp | vip | gmlpv2 |
         self.layer_num = 1
         self.beta = 1
 
@@ -615,6 +615,8 @@ class Ensemble(nn.Module):
             block = GatingMlpBlock(self.out_dim, self.out_dim * 2, self.patch)
         elif self.mlp == "vip":
             block = PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch)
+        elif self.mlp == "gmlpv2":
+            block = GatingMlpBlockv2(self.out_dim, self.out_dim * 2, self.patch,len(self.model))
         else:
             block = nn.Linear(self.out_dim, self.out_dim )
         layers=[]

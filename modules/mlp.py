@@ -24,7 +24,7 @@ from torchvision.ops.deform_conv import deform_conv2d as deform_conv2d_tv
 #     'cycle_M': _cfg(crop_pct=0.9),
 #     'cycle_L': _cfg(crop_pct=0.875),
 # }
-from modules.block import SpatialGatingUnit
+from modules.block import SpatialGatingUnit, GatingMlpBlock
 
 
 class Mlp(nn.Module):
@@ -229,7 +229,7 @@ class WeightedPermuteMLP(nn.Module):
         return x
 
 class WeightedPermuteMLPv3(nn.Module):
-    def __init__(self, dim, segment_dim=8, qkv_bias=False, taski=1,patch=63, proj_drop=0.,mlp="None"):
+    def __init__(self, dim, segment_dim=8, qkv_bias=False, taski=1,patch=63, proj_drop=0.,mlp="patch"):
         super().__init__()
         self.segment_dim = segment_dim
         self.mlp = mlp
@@ -242,14 +242,11 @@ class WeightedPermuteMLPv3(nn.Module):
                     # nn.Linear(dim, taski, bias=qkv_bias),
                                    )
         else:
-            self.mlp_h = SpatialGatingUnit(dim, taski)
-            self.up_mlp = nn.Linear(dim // 2, dim, bias=qkv_bias)
+            self.mlp_h = GatingMlpBlock(dim, dim, taski)
+            # self.up_mlp = nn.Linear(dim // 2, dim, bias=qkv_bias)
 
         if self.mlp == "patch":
-            self.mlp_w = nn.Sequential(
-                    SpatialGatingUnit(dim,patch),
-                    nn.Linear(dim // 2, dim, bias=qkv_bias),
-                                       )
+            self.mlp_w = GatingMlpBlock(dim, dim, patch)
         else:
             self.mlp_w = nn.Sequential(
                         nn.Linear(int(patch * dim // 64), int(patch * dim // 64), bias=qkv_bias),
@@ -270,7 +267,7 @@ class WeightedPermuteMLPv3(nn.Module):
             h = rearrange(h,'b t k (i h) -> b i t (h k)',h=64)
         else:
             h = self.mlp_h(x.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)
-            h = self.up_mlp(h)
+            # h = self.up_mlp(h)
 
         # B,C, H,W -> B,H,W,C
         if self.mlp != "patch":
