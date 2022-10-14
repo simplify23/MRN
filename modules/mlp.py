@@ -229,16 +229,18 @@ class WeightedPermuteMLP(nn.Module):
         return x
 
 class WeightedPermuteMLPv3(nn.Module):
-    def __init__(self, dim, segment_dim=8, qkv_bias=False, taski=1,patch=63, proj_drop=0.,mlp="patch"):
+    def __init__(self, dim, segment_dim=8, qkv_bias=False, taski=1,patch=63, proj_drop=0.,mlp="None"):
         super().__init__()
         self.segment_dim = segment_dim
+        self.taski = taski
+        self.patch = patch
         self.mlp = mlp
         self.mlp_c = nn.Sequential(
                     nn.Linear(dim, dim, bias=qkv_bias),
                                    )
         if self.mlp != "taski":
             self.mlp_h = nn.Sequential(
-                    nn.Linear(taski * 64, taski * 64, bias=qkv_bias),
+                    nn.Linear(taski * dim, taski * dim, bias=qkv_bias),
                     # nn.Linear(dim, taski, bias=qkv_bias),
                                    )
         else:
@@ -249,10 +251,10 @@ class WeightedPermuteMLPv3(nn.Module):
             self.mlp_w = GatingMlpBlock(dim, dim, patch)
         else:
             self.mlp_w = nn.Sequential(
-                        nn.Linear(int(patch * dim // 64), int(patch * dim // 64), bias=qkv_bias),
+                        nn.Linear(patch*taski, patch*taski, bias=qkv_bias),
                         # nn.Linear(dim, patch, bias=qkv_bias),
                                    )
-        self.reweight = Mlp(dim, dim // 4, dim * 3)
+        self.reweight = Mlp(dim, dim // 4, dim * 2)
 
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
@@ -262,30 +264,31 @@ class WeightedPermuteMLPv3(nn.Module):
         # print(x.shape)
 
         if self.mlp != "taski":
-            h = rearrange(x,'b i t (h k) -> b t k (i h)',h=64)
+            # h = rearrange(x,'b i t (h k) -> b t k (i h)',h=64)
+            h = rearrange(x, 'b i t c -> b t (i c)')
             h = self.mlp_h(h)
-            h = rearrange(h,'b t k (i h) -> b i t (h k)',h=64)
+            h = rearrange(h,'b t (i c) -> b i t c',i=self.taski)
         else:
             h = self.mlp_h(x.permute(0, 2, 1, 3)).permute(0, 2, 1, 3)
             # h = self.up_mlp(h)
 
         # B,C, H,W -> B,H,W,C
         if self.mlp != "patch":
-            w = rearrange(x,'b i t (h k) -> b i h (t k)',k = 4)
+            w = rearrange(x,'b i t c -> b c (i t)')
             w = self.mlp_w(w)
-            w = rearrange(w,'b i h (t k) -> b i t (h k)',k = 4)
+            w = rearrange(w,'b c (i t) -> b i t c',t = self.patch)
             # w = x.permute(0, 3, 1, 2)
             # w = self.mlp_w(w).permute(0, 2, 3, 1)
         else:
             w = self.mlp_w(x)
 
 
-        c = self.mlp_c(x)
+        # c = self.mlp_c(x)
         # B, C, H, W -> B, C,[ H, W ]
-        a = (h + w + c).permute(0, 3, 1, 2).flatten(2).mean(2)
-        a = self.reweight(a).reshape(B, C, 3).permute(2, 0, 1).softmax(dim=0).unsqueeze(2).unsqueeze(2)
+        a = (h + w).permute(0, 3, 1, 2).flatten(2).mean(2)
+        a = self.reweight(a).reshape(B, C, 2).permute(2, 0, 1).softmax(dim=0).unsqueeze(2).unsqueeze(2)
 
-        x = h * a[0] + w * a[1] + c * a[2]
+        x = h * a[0] + w * a[1]
 
         x = self.proj(x)
         x = self.proj_drop(x)

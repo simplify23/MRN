@@ -3,7 +3,7 @@ import torch.nn as nn
 import einops
 import torch
 import torch.nn as nn
-
+from einops import rearrange
 
 class SpatialGatingUnit(nn.Module):
     def __init__(self, d_ffn, seq_len):
@@ -26,6 +26,21 @@ class SpatialGatingUnit(nn.Module):
             v = v.permute(0, 2, 1)
         return u * v
 
+class SpatialGatingUnitv2(nn.Module):
+    def __init__(self, d_ffn, seq_len):
+        super().__init__()
+
+        self.norm = nn.LayerNorm(d_ffn)
+        self.proj = nn.Linear(seq_len, seq_len)
+
+    def forward(self, x):
+        # b w (i c)
+        # x = u
+        v = self.norm(x)
+        v = v.permute(0, 2, 1)
+        v = self.proj(v)
+        v = v.permute(0, 2, 1)
+        return x * v
 
 class GatingMlpBlock(nn.Module):
     def __init__(self, d_model, d_ffn, seq_len):
@@ -51,14 +66,15 @@ class GatingMlpBlock(nn.Module):
 class GatingMlpBlockv2(nn.Module):
     def __init__(self, d_model, d_ffn, seq_len,taski):
         super().__init__()
-
+        self.seq_len = seq_len
+        self.d_model = d_model
         self.norm = nn.LayerNorm(d_model)
         self.proj_1 = nn.Linear(d_model, d_ffn)
         self.activation = nn.GELU()
-        self.spatial_gating_unit = SpatialGatingUnit(d_ffn, seq_len)
-        self.spatial_gating_unit2 = SpatialGatingUnit(d_model, taski)
+        self.spatial_gating_unit = SpatialGatingUnit(d_ffn, seq_len * taski)
+        self.spatial_gating_unit2 = SpatialGatingUnitv2(seq_len, taski * d_model)
         self.proj_2 = nn.Linear(d_ffn // 2, d_model)
-        self.proj_3 = nn.Linear(d_model // 2, d_model)
+        self.proj_3 = nn.Linear(d_model, d_model)
     def forward(self, x):
         # if self.training and torch.equal(self.m.sample(), torch.zeros(1)):
         #     return x
@@ -67,10 +83,14 @@ class GatingMlpBlockv2(nn.Module):
         x = self.norm(x)
         x = self.proj_1(x)
         x = self.activation(x)
+        x = rearrange(x,'b i w c -> b (i w) c')
         x = self.spatial_gating_unit(x)
         x = self.proj_2(x)
+        x = rearrange(x, 'b (i w) c -> b i w c',w=self.seq_len)
         x = x + shorcut
-        x = self.spatial_gating_unit2(x.permute(0,2,1,3)).permute(0,2,1,3)
+        x = rearrange(x,'b i w c -> b (i c) w',c=self.d_model)
+        x = self.spatial_gating_unit2(x)
+        x = rearrange(x, 'b (i c) w -> b i w c', c=self.d_model)
         x = self.proj_3(x)
         return x + shorcut
 
