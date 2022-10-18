@@ -33,6 +33,12 @@ class Dataset_Manager(object):
             memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=self.opt.memory_num,index_array=index_list)
             self.create_dataloader_mix(IndexConcatDataset([memory_data,split_dataset]),self.opt.batch_size)
             print("taski is {} current dataset chose {}\n now dataset chose {}".format(taski,int(self.opt.memory_num/taski),len(memory_data)))
+        elif memory == "test_ch":
+            # index_current = numpy.random.choice(range(len(dataset)),int(self.opt.memory_num/taski),replace=False)
+            # split_dataset = Subset(dataset,index_current.tolist())
+            memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=self.opt.memory_num,index_array=index_list)
+            self.create_dataloader_mix(IndexConcatDataset([memory_data,dataset]),self.opt.batch_size)
+            print("taski is {} current dataset chose {}\n now dataset chose {}".format(taski,int(self.opt.memory_num/taski),len(memory_data)))
         elif memory == "large":
             index_current = numpy.random.choice(range(len(dataset)), memory_num, replace=False)
             split_dataset = Subset(dataset, index_current.tolist())
