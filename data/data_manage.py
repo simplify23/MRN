@@ -53,8 +53,8 @@ class Dataset_Manager(object):
             # curr : total  mem : total(repeat)
             total_data_list = []
             total_data_list.append(dataset)
-            for i in range(taski-1):
-                dataset = self.create_dataset(data_list=self.select_data, taski=i+1)
+            for i in range(taski):
+                dataset = self.create_dataset(data_list=self.select_data, taski=i)
                 total_data_list.append(dataset)
             self.create_dataloader_mix(IndexConcatDataset(total_data_list), self.opt.batch_size)
             print("taski is {} current dataset chose {} lenth dataset\n now dataset chose {}".format(taski, len(total_data_list),
