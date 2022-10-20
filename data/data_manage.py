@@ -28,24 +28,37 @@ class Dataset_Manager(object):
         dataset = self.create_dataset(data_list=self.select_data,taski=taski)
 
         if memory == "test":
+            # curr: num/(taski-1) mem: num/(taski-1)
             index_current = numpy.random.choice(range(len(dataset)),int(self.opt.memory_num/taski),replace=False)
             split_dataset = Subset(dataset,index_current.tolist())
             memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=self.opt.memory_num,index_array=index_list)
             self.create_dataloader_mix(IndexConcatDataset([memory_data,split_dataset]),self.opt.batch_size)
             print("taski is {} current dataset chose {}\n now dataset chose {}".format(taski,int(self.opt.memory_num/taski),len(memory_data)))
         elif memory == "test_ch":
+            # curr: total  mem: num/(taski-1) (repeat)
             # index_current = numpy.random.choice(range(len(dataset)),int(self.opt.memory_num/taski),replace=False)
             # split_dataset = Subset(dataset,index_current.tolist())
-            memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=self.opt.memory_num,index_array=index_list)
+            memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=self.opt.memory_num,index_array=index_list,repeat=True)
             self.create_dataloader_mix(IndexConcatDataset([memory_data,dataset]),self.opt.batch_size)
             print("taski is {} current dataset chose {}\n now dataset chose {}".format(taski,int(self.opt.memory_num/taski),len(memory_data)))
         elif memory == "large":
+            # curr: num  mem: num
             index_current = numpy.random.choice(range(len(dataset)), memory_num, replace=False)
             split_dataset = Subset(dataset, index_current.tolist())
             memory_data, index_list = self.rehearsal_memory(taski, random=False, total_num=memory_num*taski, index_array=index_list)
             self.create_dataloader_mix(IndexConcatDataset([memory_data, split_dataset]), self.opt.batch_size)
             print("taski is {} current dataset chose {}\n now dataset chose {}".format(taski, int(memory_num),
                                                                                        len(memory_data)))
+        elif memory == "total":
+            # curr : total  mem : total(repeat)
+            total_data_list = []
+            total_data_list.append(dataset)
+            for i in range(taski-1):
+                dataset = self.create_dataset(data_list=self.select_data, taski=i+1)
+                total_data_list.append(dataset)
+            self.create_dataloader_mix(IndexConcatDataset(total_data_list), self.opt.batch_size)
+            print("taski is {} current dataset chose {} lenth dataset\n now dataset chose {}".format(taski, len(total_data_list),
+                                                                                       len(dataset)))
         elif memory != None:
             memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=memory_num,index_array=index_list)
             self.create_dataloader(memory_data,(self.opt.batch_size)//2)
@@ -119,15 +132,15 @@ class Dataset_Manager(object):
             data_list.append(split_dataset)
         return ConcatDataset(data_list)
 
-    def rehearsal_memory(self,taski, random=False,total_num=2000,index_array=None):
+    def rehearsal_memory(self,taski, random=False,total_num=2000,index_array=None,repeat=False):
         data_list = []
         select_data = self.select_data
         num_i = int(total_num/(taski))
         print("memory size is {}\n".format(num_i))
         for i in range(taski):
-            dataset = self.create_dataset(data_list=select_data,taski=i,repeat=False)
+            dataset = self.create_dataset(data_list=select_data,taski=i,repeat=repeat)
             if random:
-                index_list = numpy.random.choice(range(len(dataset)),num_i,replace=False)
+                index_list = numpy.random.choice(range(len(dataset)),num_i,replace=repeat)
             # print(random)
             else:
                 index_list = index_array[i]

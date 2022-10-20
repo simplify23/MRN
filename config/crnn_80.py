@@ -1,7 +1,7 @@
 common=dict(
     exp_name="CRNN_ems_test",  # Where to store logs and models
     il="ems",  # joint_mix ｜ joint_loader | base | lwf | wa | ewc ｜ der  | ems
-    memory="test", # None | rehearsal | random | bag | score | loss_max | test (just for ems) |large
+    memory="total", # None | rehearsal | random | test (just for ems) |large | total | bag | score | loss_max |
     memory_num=2000,
     batch_max_length = 25,
     imgH = 32,
