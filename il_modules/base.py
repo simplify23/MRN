@@ -394,7 +394,7 @@ class BaseLearner(object):
             label_score = 0.0
             for ch in label:
                 if char.get(ch, None) != None:
-                    label_score += pow(char[ch],-1.5)
+                    label_score += pow(char[ch],-1)
             label_score = label_score / labels_length
             index_array.append(Label(label,index,label_score))
 
