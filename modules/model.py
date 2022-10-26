@@ -429,7 +429,7 @@ class Ensemble(nn.Module):
             self.patch = 64
         elif self.opt.FeatureExtraction == "ResNet":
             self.patch = 65
-        self.mlp = "vip"  #gmlp | vip | gmlpv2 |
+        self.mlp = "gmlpv2"  #gmlp | vip | gmlpv2 |
         self.layer_num = 1
         self.beta = 1
 
@@ -669,6 +669,13 @@ class Ensemble(nn.Module):
 
     def copy(self):
         return copy.deepcopy(self)
+
+    def freeze(self):
+        for param in self.parameters():
+            param.requires_grad = False
+        self.eval()
+
+        return self
 
     def db_function(self, x, k = 50):
         return torch.reciprocal(1 + torch.exp(-k * x))

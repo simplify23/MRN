@@ -49,6 +49,7 @@ class Ensem(BaseLearner):
         # will we need this line ? (AB Study)
         self.model = self.model.module
         self._known_classes = self._total_classes
+        self._old_network = self.model.copy().freeze()
         # logging.info('Exemplar size: {}'.format(self.exemplar_size))
 
     def model_eval_and_train(self,taski):
