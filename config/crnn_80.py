@@ -1,7 +1,7 @@
 common=dict(
     exp_name="CRNN_ems_test",  # Where to store logs and models
-    il="ems",  # joint_mix ｜ joint_loader | base | lwf | wa | ewc ｜ der  | ems
-    memory="score",  # None | random | bag | cof_max | score
+    il="ewc",  # joint_mix ｜ joint_loader | base | lwf | wa | ewc ｜ der  | ems
+    memory="random",  # None | random | bag | cof_max | score
     # None | random | test (just for ems) |large | total | bag | score | cof_max | rehearsal |
     memory_num=2000,
     batch_max_length = 25,
@@ -16,9 +16,9 @@ common=dict(
 model=dict(
     model_name="SVTR",
     Transformation = "None",    #None TPS
-    FeatureExtraction = "VGG",  #VGG ResNet
-    SequenceModeling = "BiLSTM",
-    Prediction = "Attn",  #CTC Attn
+    FeatureExtraction = "SVTR",  #VGG ResNet
+    SequenceModeling = "None",
+    Prediction = "CTC",  #CTC Attn
     num_fiducial=20,
     input_channel=4,
     output_channel=512,

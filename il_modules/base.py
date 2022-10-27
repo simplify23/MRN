@@ -326,7 +326,7 @@ class BaseLearner(object):
             #     labels, batch_max_length=self.opt.batch_max_length
             # )
             # batch_size = image.size(0)
-            preds = self._old_network(image)
+            preds = self._old_network(image)['logits']
             preds_list = torch.max(preds,-1)[0].cpu()
             for pred_seq in preds_list:
                 cof = 0.0
