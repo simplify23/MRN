@@ -452,6 +452,8 @@ class Ensemble(nn.Module):
             index = None
         # elif is_train == False:
         #     features, index = self.cross_test(image)
+        elif is_train == False:
+            features, index = self.cross_forward_expert(image, text, is_train)
         else:
             # features,index = self.cross_forwardv2(image)
             features, index = self.cross_forward_dim4(image,text,is_train)
@@ -498,6 +500,36 @@ class Ensemble(nn.Module):
         # return out  # [b, num_steps, opt.num_class]
         return output.contiguous(),index
 
+    def cross_forward_expert(self, image, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        features = [convnet(image,text,is_train) for convnet in self.model]
+        route_info = torch.stack([feature["feature"] for feature in features], 1)
+        route_info = self.mlp3d(route_info)
+        route_info = rearrange(route_info,'b i t (h k) -> b i h (t k)',h=64)
+        # route_info = rearrange(route_info, 'b i t c -> b t (i c)')
+        route_info = self.route(route_info).mean(-1)
+        route_info = rearrange(route_info, 'b i h -> b (i h)')
+        index = self.channel_route(route_info)
+        index = torch.max(index, -1)[1]
+
+        # index [B,I]
+        # route_info [B,T,I]
+
+        # feature_array = torch.stack(features, 1)
+        features = [feature["predict"] for feature in features]
+        B, T, C = features[-1].size()
+        list_len = len(features)
+        normal_feat = []
+        for i in range(list_len - 1):
+            feat = self.pad_zeros_features(features[i], total=C)
+            normal_feat.append(feat)
+        normal_feat.append(features[-1])
+        normal_feat = torch.stack(normal_feat, 0)
+        # normal_feat [I,B,T,C] -> [T,C,B,I] -> [B,T,C,I]
+        output = torch.stack([normal_feat[index_one][i,:,:]for i,index_one in enumerate(index)],0)
+
+        return output.contiguous(),index
+
     def cross_forward_dim4(self, image, text=None, is_train=True, SelfSL_layer=False):
         """Transformation stage"""
         features = [convnet(image,text,is_train) for convnet in self.model]
@@ -508,7 +540,7 @@ class Ensemble(nn.Module):
         route_info = self.route(route_info).mean(-1)
         route_info = rearrange(route_info, 'b i h -> b (i h)')
         index = self.channel_route(route_info).softmax(dim=-1)
-
+        index = self.softargmax1d(index,100)
         # index [B,I]
         # route_info [B,T,I]
 
