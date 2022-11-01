@@ -148,3 +148,64 @@ class CBAM(nn.Module):
         out = self.channel_attention(x) * x
         out = self.spatial_attention(out) * out
         return out
+
+class Autoencoder(nn.Module):
+    def __init__(self, input_dims = 64*256, code_dims = 128):
+        super(Autoencoder, self).__init__()
+        self.encoder = nn.Sequential(
+        nn.Linear(input_dims, code_dims),
+        nn.ReLU())
+        self.decoder = nn.Sequential(
+        nn.Linear(code_dims, input_dims),
+        nn.Sigmoid())
+
+
+    def forward(self, x):
+        encoded_x = self.encoder(x)
+        reconstructed_x = self.decoder(encoded_x)
+        return reconstructed_x
+
+class Autoencoderv2(nn.Module):
+    def __init__(self, input_dims = 4, code_dims = 128):
+        super(Autoencoderv2, self).__init__()
+        self.encoder = nn.Sequential(
+        nn.Conv2d(4, 64, 3, 2, 1),
+        nn.BatchNorm2d(64),
+        nn.ReLU(),
+        nn.Conv2d(64, 64, 3, 2, 1),
+        nn.BatchNorm2d(64),
+        nn.ReLU(),
+        nn.Conv2d(64, code_dims, 3, 2, 1),
+        nn.BatchNorm2d(code_dims),
+        nn.ReLU(),
+        )
+        self.decoder = nn.Sequential(
+        nn.Upsample(
+                scale_factor=2,
+                mode='nearest',
+                align_corners=None),
+        nn.Conv2d(128, 64, 3, 1, 1),
+        nn.BatchNorm2d(64),
+        nn.ReLU(),
+        nn.Upsample(
+                scale_factor=2,
+                mode='nearest',
+                align_corners=None),
+        nn.Conv2d(64, 64, 3, 1, 1),
+        nn.BatchNorm2d(64),
+        nn.ReLU(),
+        nn.Upsample(
+                scale_factor=2,
+                mode='nearest',
+                align_corners=None),
+        nn.Conv2d(64, 4, 3, 1, 1),
+        nn.BatchNorm2d(4),
+        # nn.ReLU(),
+        nn.Sigmoid())
+
+
+    def forward(self, x):
+        encoded_x = self.encoder(x)
+        reconstructed_x = self.decoder(encoded_x)
+        return reconstructed_x
+

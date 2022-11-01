@@ -4,7 +4,7 @@ import torch
 from einops import rearrange
 import torch.nn as nn
 
-from modules.block import GatingMlpBlock, GatingMlpBlockv2
+from modules.block import GatingMlpBlock, GatingMlpBlockv2, Autoencoder, Autoencoderv2
 from modules.mlp import PermutatorBlock, CycleMLP
 from modules.transformation import TPS_SpatialTransformerNetwork
 from modules.feature_extraction import (
@@ -304,11 +304,54 @@ class Model(nn.Module):
 
         return self
 
+
+class ExpertNet(Model):
+    def __init__(self, opt, SelfSL_layer=False):
+        super(ExpertNet, self).__init__(opt)
+        self.opt = opt
+        self.model = Model_Extractor(opt)
+        self.SequenceModeling_output = self.model.SequenceModeling_output
+        self.stages = {
+            # "Trans": opt.Transformation,
+            # "Feat": opt.FeatureExtraction,
+            # "Seq": opt.SequenceModeling,
+            "Pred": opt.Prediction,
+        }
+        if self.opt.FeatureExtraction == "VGG":
+            self.patch = 63
+        elif self.opt.FeatureExtraction == "SVTR":
+            self.patch = 64
+        elif self.opt.FeatureExtraction == "ResNet":
+            self.patch = 65
+        self.gate = Autoencoderv2()
+        self.fc = None
+        self.Prediction = None
+
+
+    def forward(self, image, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        contextual_feature = self.model(image)
+        gate_feature = self.gate(image)
+        """ Prediction stage """
+        if self.stages["Pred"] == "CTC":
+            prediction = self.Prediction(contextual_feature.contiguous())
+        else:
+            prediction = self.Prediction(
+                contextual_feature.contiguous(),
+                text,
+                is_train,
+                batch_max_length=self.opt.batch_max_length,
+            )
+
+        # return prediction  # [b, num_steps, opt.num_class]
+        return {"predict": prediction, "feature": contextual_feature, "gate_feature":gate_feature}
+
+
 class DERNet(Model):
     def __init__(self, opt):
         super(DERNet,self).__init__(opt)
         self.model = nn.ModuleList()
-        self.out_dim=None
+        self.out_dim = None
         self.fc = None
         self.aux_fc=None
         self.task_sizes = []
@@ -452,11 +495,11 @@ class Ensemble(nn.Module):
             index = None
         # elif is_train == False:
         #     features, index = self.cross_test(image)
-        elif is_train == False:
-            features, index = self.cross_forward_expert(image, text, is_train)
+        # elif is_train == False:
+        #     features, index = self.cross_forward_expert(image, text, is_train)
         else:
             # features,index = self.cross_forwardv2(image)
-            features, index = self.cross_forward_dim4(image,text,is_train)
+            features, index = self.cross_forward_dim3(image,text,is_train)
         # out=self.fc(features) #{logics: self.fc(features)}
         out = dict({"logits":features,"index":index,"aux_logits":None})
 
@@ -535,6 +578,9 @@ class Ensemble(nn.Module):
         features = [convnet(image,text,is_train) for convnet in self.model]
         route_info = torch.stack([feature["feature"] for feature in features], 1)
         route_info = self.mlp3d(route_info)
+
+        # route_info = rearrange(route_info, 'b i t c -> b t (i c)')
+
         route_info = rearrange(route_info,'b i t (h k) -> b i h (t k)',h=64)
         # route_info = rearrange(route_info, 'b i t c -> b t (i c)')
         route_info = self.route(route_info).mean(-1)
@@ -631,12 +677,12 @@ class Ensemble(nn.Module):
             self.out_dim=self.model[-1].SequenceModeling_output
         # self.route = nn.Linear(self.patch * len(self.model), len(self.model))
         patch_hidden = int(self.patch * self.out_dim // 64)
-        self.route = nn.Linear(patch_hidden,patch_hidden)
-        self.channel_route = nn.Linear(len(self.model)*64,len(self.model))
+        # self.route = nn.Linear(patch_hidden,patch_hidden)
+        # self.channel_route = nn.Linear(len(self.model)*64,len(self.model))
 
 
-        # # self.route = nn.Linear(self.patch , 1)
-        # self.channel_route = nn.Linear(self.feature_dim, len(self.model))
+        self.route = nn.Linear(self.patch  , 1)
+        self.channel_route = nn.Linear(self.feature_dim, len(self.model))
 
         # self.gmlp = GatingMlpBlock(self.feature_dim, self.feature_dim // len(self.model), self.patch),
         # self.gmlp = nn.Sequential(
@@ -775,3 +821,69 @@ class Ensemble(nn.Module):
     #     self.eval()
     #
     #     return self
+
+class Expert_Gate(Ensemble):
+    def __init__(self, opt):
+        super(Expert_Gate, self).__init__(opt)
+        self.model = nn.ModuleList()
+        # self.gate = nn.ModuleList()
+        self.out_dim=None
+        self.fc = None
+        self.opt = opt
+        self.task_sizes = []
+        if self.opt.FeatureExtraction == "VGG":
+            self.patch = 63
+        elif self.opt.FeatureExtraction == "SVTR":
+            self.patch = 64
+        elif self.opt.FeatureExtraction == "ResNet":
+            self.patch = 65
+        self.mlp = "gmlpv2"  #gmlp | vip | gmlpv2 |
+        self.layer_num = 1
+        self.beta = 1
+        self.loss = nn.MSELoss(reduction=None)
+
+    def forward(self, image, cross=True, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        # # features = [convnet(image) for convnet in self.model]
+        # predict = self.model[-1](image, text, is_train)["predict"]
+        #
+        # logits = [convnet(image, text, is_train) for convnet in self.model]
+        # # features = torch.stack([feature["feature"] for feature in logits], 1)
+        # features = torch.stack([feature["gate_feature"] for feature in logits], 1)
+
+        if is_train == False:
+            predict,feature, gate_feature= self.expert_test(image, text, is_train)
+        else:
+            predict = self.model[-1](image, text, is_train)["predict"]
+            feature = self.model[-1](image, text, is_train)["feature"]
+            gate_feature = self.model[-1](image, text, is_train)["gate_feature"]
+
+        out = dict({"logits": predict, "feature": feature, "gate_feature": gate_feature})
+
+        return out  # [b, num_steps, opt.num_class]
+
+    def expert_test(self,image, text, is_train):
+        features = [convnet(image,text,is_train) for convnet in self.model]
+        gate_feature = torch.stack([feature["gate_feature"] for feature in features], 1)
+        origin_feature = torch.stack([feature["feature"] for feature in features], 1)
+        predict = torch.stack([feature["predict"] for feature in features], 1)
+        # loss = self.loss(image,gate_feature)
+        loss = torch.stack([self.loss(image,gate_f) for gate_f in gate_feature], 0)
+        # predict = index
+        return predict, origin_feature, gate_feature
+
+
+    def update_fc(self, hidden_size, nb_classes, device=None):
+        self.model.append(ExpertNet(self.opt))
+        self.model[-1].new_fc(hidden_size, nb_classes)
+        # self.model[-1].load_state_dict(self.model[-2].state_dict())
+
+        if self.out_dim is None:
+            self.out_dim = self.model[-1].SequenceModeling_output
+        #
+        # block = Autoencoder(self.patch * self.out_dim)
+        # self.gate.append(block)
+        # self.route = nn.Linear(self.patch, 1)
+        # self.channel_route = nn.Linear(self.feature_dim, len(self.model))
+
+
