@@ -166,7 +166,7 @@ def validation(model, criterion, eval_loader, converter, opt, val_choose="val",t
                 preds = model(image,cross = True, is_train = False)
             else:
                 preds = model(image)
-            if len(preds) == 3:
+            if len(preds) == 3 or len(preds) == 4:
                 preds = preds['logits']
             elif len(preds) == 2:
                 preds = preds['predict']

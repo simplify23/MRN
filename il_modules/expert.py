@@ -16,7 +16,7 @@ from torch.autograd import Variable
 from data.dataset import hierarchical_dataset
 from il_modules.base import BaseLearner
 from il_modules.der import DER
-from modules.model import DERNet, Ensemble, Expert_Gate
+from modules.model import DERNet, Ensemble, Expert_Gate, Expert_Gatev2
 from test import validation
 from tools.utils import Averager, adjust_learning_rate
 
@@ -43,7 +43,7 @@ class Expert(BaseLearner):
     def __init__(self, opt):
         super().__init__(opt)
         # self.model = Ensemblev2(opt)
-        self.model = Expert_Gate(opt)
+        self.model = Expert_Gatev2(opt)
         self.criterion2 = nn.MSELoss()
 
     def after_task(self):
@@ -167,6 +167,8 @@ class Expert(BaseLearner):
             for i in range(taski):
                 for p in self.model.module.model[i].parameters():
                     p.requires_grad = False
+                for p in self.model.module.gate[i].parameters():
+                    p.requires_grad = False
 
         # filter that only require gradient descent
         filtered_parameters = self.count_param(self.model,False)
@@ -204,9 +206,9 @@ class Expert(BaseLearner):
 
     def _train(self, start_iter,taski, train_loader, valid_loader,step=0):
 
-        if self.opt.start_task > taski + step *0.5:
+        if self.opt.start_task > taski :
             name = self.opt.lan_list[taski]
-            saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_{step}_best_score.pth"
+            saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_best_score.pth"
             self.model.load_state_dict(torch.load(f"{saved_best_model}"), strict=True)
             print(
                 'Task {} load checkpoint from {}.'.format(taski, saved_best_model)
@@ -227,7 +229,11 @@ class Expert(BaseLearner):
                 'Task {} start training for model ------{}------'.format(taski, self.opt.exp_name)
             )
             """ start training """
-            self._init_train(start_iter, taski, train_loader, valid_loader.create_dataset(), cross=False)
+            if step == 0:
+                self._init_train(start_iter, taski, train_loader, valid_loader.create_dataset(), cross=False)
+            # elif step == 1:
+            #     self.freeze_step1(taski)
+            #     self._update_representation(start_iter, taski, train_loader, valid_loader.create_dataset(), cross=True)
             # if taski == 0:
             #     # valid_loader = valid_loader.create_dataset()
             #     self._init_train(start_iter,taski, train_loader, valid_loader.create_dataset(),cross=False)
@@ -246,6 +252,7 @@ class Expert(BaseLearner):
     def _init_train(self,start_iter,taski, train_loader, valid_loader,cross=False):
         # loss averager
         train_loss_avg = Averager()
+        train_taski_loss_avg = Averager()
         start_time = time.time()
         best_score = -1
 
@@ -270,20 +277,24 @@ class Expert(BaseLearner):
                 preds = output["logits"]
                 # taski_loss = output["gate_feature"]
                 taski_loss = self.criterion2(image, output["gate_feature"])
+                preds_log_softmax2 = output["gate_logits"].log_softmax(2).permute(1, 0, 2)
+
                 # preds = self.model(image)
                 preds_size = torch.IntTensor([preds.size(1)] * batch_size)
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
                 loss = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
+                taski_loss2 = self.criterion(preds_log_softmax2, labels_index, preds_size, labels_length)
             else:
                 output = self.model(image, cross,labels_index[:, :-1])  # align with Attention.forward
                 preds = output["logits"]
-                taski_loss = self.criterion2(image, output["gate_feature"])
+                # taski_loss = self.criterion2(image, output["gate_feature"])
                 # taski_loss = output["loss"]
                 target = labels_index[:, 1:]  # without [SOS] Symbol
                 loss = self.criterion(
                     preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
                 )
-            loss = loss + taski_loss
+            loss = loss + taski_loss + taski_loss2
+            # loss = loss + taski_loss
             self.model.zero_grad()
             loss.backward()
             # taski_loss.backward()
@@ -293,6 +304,7 @@ class Expert(BaseLearner):
             )  # gradient clipping with 5 (Default)
             self.optimizer.step()
             train_loss_avg.add(loss)
+            train_taski_loss_avg.add(taski_loss+taski_loss2)
 
             if "super" in self.opt.schedule:
                 self.scheduler.step()
@@ -301,12 +313,13 @@ class Expert(BaseLearner):
 
             # validation part.
             # To see training progress, we also conduct validation when 'iteration == 1'
-            if iteration % self.opt.val_interval == 0 or iteration ==self.opt.num_iter:
+            if iteration % self.opt.val_interval == 0 or iteration ==int(self.opt.num_iter)//4:
                 # for validation log
                 # print("66666666")
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
-                    train_loss_avg, None, taski,0,"FF")
+                    train_loss_avg, train_taski_loss_avg, taski,0,"FF")
                 train_loss_avg.reset()
+                # train_taski_loss_avg.reset()
 
     def update_step1(self,start_iter,taski, train_loader, valid_loader):
         self.model_eval_and_train(taski)
@@ -324,41 +337,27 @@ class Expert(BaseLearner):
             p.requires_grad = False
         self.model.module.model[-1].eval()
 
-
-    def _update_representation(self,start_iter, taski, train_loader, valid_loader,pi=15):
+    def _update_representation(self,start_iter, taski, train_loader, valid_loader, cross=False):
         # loss averager
         train_loss_avg = Averager()
-
-        train_taski_loss_avg = Averager()
-        # loss_taski = nn.MSELoss()
-        #
-        # self.model_eval_and_train(taski)
-        # self._init_train(start_iter, taski, train_loader, valid_loader)
-        # filtered_parameters = self.count_param(self.model, False)
-        self.criterion = self.build_criterion()
+        # train_taski_loss_avg = Averager()
+        start_time = time.time()
+        best_score = -1
 
         filtered_parameters = self.count_param(self.model)
 
         # setup optimizer
         self.build_custom_optimizer(filtered_parameters,optimizer="adam",schedule="super",scale=1)
 
-        # for name, param in self.model.named_parameters():
-        #     if param.requires_grad:
-        #         print(name)
-
-
-        start_time = time.time()
-        best_score = -1
-
         # training loop
         for iteration in tqdm(
-                range(start_iter + 1, int(self.opt.num_iter//2) + 1),
+                range(start_iter + 1, int(self.opt.num_iter // 2) + 1),
                 total=int(self.opt.num_iter//2),
                 position=0,
                 leave=True,
         ):
-            image_tensors, labels, indexs = train_loader.get_batch2()
-            indexs = torch.LongTensor(indexs).squeeze().to(self.device)
+            image_tensors, labels = train_loader.get_batch()
+
             image = image_tensors.to(self.device)
             labels_index, labels_length = self.converter.encode(
                 labels, batch_max_length=self.opt.batch_max_length
@@ -367,56 +366,50 @@ class Expert(BaseLearner):
 
             # default recognition loss part
             if "CTC" in self.opt.Prediction:
-                output= self.model(image,True)
-                # [B,T,C,I], [B,I]
-                preds = output["logits"]
-
-                taski_loss = output["loss"]
-                preds_size = torch.IntTensor([preds.size(1)] * batch_size)
-                # B，T，C(max) -> T, B, C
-                preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
-                loss_clf = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
+                output = self.model(image, cross)
+                # preds = output["logits"]
+                # taski_loss = output["gate_feature"]
+                loss = self.criterion2(image, output["gate_feature"])
+                # preds = self.model(image)
+                # preds_size = torch.IntTensor([preds.size(1)] * batch_size)
+                # preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
+                # loss = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
             else:
-                output = self.model(image, cross = True,text = labels_index[:, :-1],is_train=True)  # align with Attention.forward
-                preds = output["logits"]
-                taski_loss = output["loss"]
-                # taski_loss = self.taski_criterion(output["index"], indexs)
-                # aux_logits = output["aux_logits"]
-                # aux_targets = labels_index.clone()[:, 1:]
-                target = labels_index[:, 1:]  # without [SOS] Symbol
-                loss_clf = self.criterion(
-                    preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
-                )
-                # loss_aux = self.criterion(
-                #     aux_logits.view(-1, aux_logits.shape[-1]), aux_targets.contiguous().view(-1)
+                output = self.model(image, cross, labels_index[:, :-1])  # align with Attention.forward
+                # preds = output["logits"]
+                loss = self.criterion2(image, output["gate_feature"])
+                # taski_loss = output["loss"]
+                # target = labels_index[:, 1:]  # without [SOS] Symbol
+                # loss = self.criterion(
+                #     preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
                 # )
-            # loss = loss_clf + loss_aux
-            # loss = loss_clf + pi * taski_loss
-            loss = loss_clf + taski_loss
-            # loss.requires_grad_(True)
+            # loss = loss
+            # loss = loss + taski_loss
             self.model.zero_grad()
             loss.backward()
+            # taski_loss.backward()
+
             torch.nn.utils.clip_grad_norm_(
                 self.model.parameters(), self.opt.grad_clip
             )  # gradient clipping with 5 (Default)
             self.optimizer.step()
-            train_loss_avg.add(loss_clf)
-            train_taski_loss_avg.add(taski_loss)
+            train_loss_avg.add(loss)
+            # train_taski_loss_avg.add(taski_loss)
 
-            self.scheduler.step()
-            # if "super" in self.opt.schedule:
-            #     self.scheduler.step()
-            # else:
-            #     adjust_learning_rate(self.optimizer, iteration, self.opt)
+            if "super" in self.opt.schedule:
+                self.scheduler.step()
+            else:
+                adjust_learning_rate(self.optimizer, iteration, self.opt)
 
             # validation part.
             # To see training progress, we also conduct validation when 'iteration == 1'
-            if iteration % (self.opt.val_interval//5)== 0 or iteration == int(self.opt.num_iter//2) or iteration == 1:
+            if iteration % self.opt.val_interval == 0 or iteration == self.opt.num_iter:
                 # for validation log
-                self.val(valid_loader, self.opt,  best_score, start_time, iteration,
-                    train_loss_avg,train_taski_loss_avg, taski, step=1,val_choose = "TF")
+                # print("66666666")
+                self.val(valid_loader, self.opt, best_score, start_time, iteration,
+                         train_loss_avg, None, taski, 0, "FF")
                 train_loss_avg.reset()
-                train_taski_loss_avg.reset()
+                # train_taski_loss_avg.reset()
 
     def val(self, valid_loader, opt, best_score, start_time, iteration,
             train_loss_avg, train_taski_loss_avg, taski, step,val_choose="val"):

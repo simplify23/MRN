@@ -150,24 +150,35 @@ class CBAM(nn.Module):
         return out
 
 class Autoencoder(nn.Module):
-    def __init__(self, input_dims = 64*256, code_dims = 128):
+    def __init__(self, out_dim, patch, taski,hidden_dim=512):
         super(Autoencoder, self).__init__()
         self.encoder = nn.Sequential(
-        nn.Linear(input_dims, code_dims),
+        nn.Linear(out_dim, 512),
         nn.ReLU())
         self.decoder = nn.Sequential(
-        nn.Linear(code_dims, input_dims),
+        nn.Linear(hidden_dim, out_dim),
         nn.Sigmoid())
 
 
     def forward(self, x):
+        B, H, W, C = x.shape
+        # return x
+        # x = rearrange(x, 'b i w c -> b i (w c)')
         encoded_x = self.encoder(x)
         reconstructed_x = self.decoder(encoded_x)
+        # reconstructed_x = rearrange(reconstructed_x, 'b i (w c) -> b i w c',w=W, c=C)
         return reconstructed_x
 
 class Autoencoderv2(nn.Module):
     def __init__(self, input_dims = 4, code_dims = 128):
         super(Autoencoderv2, self).__init__()
+        self.atten = nn.Sequential(
+            nn.Linear(4*32, 4 * 32),
+            # nn.ReLU(),
+            # nn.Linear(512, 4 * 32 * 64),
+            nn.Sigmoid()
+        )
+        # self.cbam = CBAM(64)
         self.encoder = nn.Sequential(
         nn.Conv2d(4, 64, 3, 2, 1),
         nn.BatchNorm2d(64),
@@ -175,8 +186,8 @@ class Autoencoderv2(nn.Module):
         nn.Conv2d(64, 64, 3, 2, 1),
         nn.BatchNorm2d(64),
         nn.ReLU(),
-        nn.Conv2d(64, code_dims, 3, 2, 1),
-        nn.BatchNorm2d(code_dims),
+        nn.Conv2d(64, 64, 3, 2, 1),
+        nn.BatchNorm2d(64),
         nn.ReLU(),
         )
         self.decoder = nn.Sequential(
@@ -184,7 +195,7 @@ class Autoencoderv2(nn.Module):
                 scale_factor=2,
                 mode='nearest',
                 align_corners=None),
-        nn.Conv2d(128, 64, 3, 1, 1),
+        nn.Conv2d(64, 64, 3, 1, 1),
         nn.BatchNorm2d(64),
         nn.ReLU(),
         nn.Upsample(
@@ -201,11 +212,117 @@ class Autoencoderv2(nn.Module):
         nn.Conv2d(64, 4, 3, 1, 1),
         nn.BatchNorm2d(4),
         # nn.ReLU(),
-        nn.Sigmoid())
+        )
 
 
     def forward(self, x):
         encoded_x = self.encoder(x)
+        encoded_x = rearrange(encoded_x, 'b c h w -> b c (h w)')
+        atten_x = self.atten(encoded_x)
+        encoded_x = rearrange(encoded_x * atten_x, 'b c (h w) -> b c h w', h=4, w=32)
         reconstructed_x = self.decoder(encoded_x)
         return reconstructed_x
+
+class Autoencoderv3(nn.Module):
+    def __init__(self, input_dims = 4, code_dims = 128):
+        super(Autoencoderv3, self).__init__()
+        self.fc = nn.Sequential(
+            nn.Linear(63, 64),
+            nn.ReLU(),
+        )
+        # self.atten = CBAM(64)
+        self.decoder = nn.Sequential(
+        nn.Upsample(
+                size = (8,64),
+                # scale_factor=2,
+                mode='nearest',
+                align_corners=None),
+        nn.Conv2d(256, 128, 3, 1, 1),
+        nn.BatchNorm2d(128),
+        nn.ReLU(),
+        nn.Upsample(
+                scale_factor=2,
+                mode='nearest',
+                align_corners=None),
+        nn.Conv2d(128, 64, 3, 1, 1),
+        nn.BatchNorm2d(64),
+        nn.ReLU(),
+        nn.Upsample(
+                scale_factor=2,
+                mode='nearest',
+                align_corners=None),
+        nn.Conv2d(64, 4, 3, 1, 1),
+        nn.BatchNorm2d(4),
+        # nn.ReLU(),
+        )
+
+    def forward(self, x):
+        # encoded_x = self.encoder(x)
+        x = rearrange(x, 'b t c -> b c t')
+        x = self.fc(x)
+        x = rearrange(x, 'b c (h w) -> b c h w',h=4, w=16)
+        # encoded_x = self.atten(encoded_x)
+        # encoded_x = atten * encoded_x
+        # encoded_x = rearrange(encoded_x, 'b c (h w) -> b c h w', h=4, w=32)
+        reconstructed_x = self.decoder(x)
+        return reconstructed_x
+
+
+class Autoencoderv4(nn.Module):
+    def __init__(self, input_dims = 4, out_dim = 128):
+        super(Autoencoderv4, self).__init__()
+        self.fc = nn.Sequential(
+            nn.Linear(64, out_dim),
+            # nn.ReLU(),
+            # nn.Linear(512, 4 * 32 * 64),
+            # nn.Sigmoid()
+        )
+        # self.fc =
+        self.encoder = nn.Sequential(
+        nn.Conv2d(4, 64, 3, 2, 1),
+        nn.BatchNorm2d(64),
+        nn.ReLU(),
+        nn.Conv2d(64, 64, 3, 2, 1),
+        nn.BatchNorm2d(64),
+        nn.ReLU(),
+        nn.Conv2d(64, 64, 3, 2, 1),
+        nn.BatchNorm2d(64),
+        nn.ReLU(),
+        nn.Conv2d(64, 64, (1,3), (1,2), 1),
+        nn.BatchNorm2d(64),
+        nn.ReLU(),
+        )
+        self.decoder = nn.Sequential(
+        nn.Upsample(
+                size=(8,64),
+                # scale_factor=(2,4),
+                mode='nearest',
+                align_corners=None),
+        nn.Conv2d(64, 64, 3, 1, 1),
+        nn.BatchNorm2d(64),
+        nn.ReLU(),
+        nn.Upsample(
+                scale_factor=2,
+                mode='nearest',
+                align_corners=None),
+        nn.Conv2d(64, 64, 3, 1, 1),
+        nn.BatchNorm2d(64),
+        nn.ReLU(),
+        nn.Upsample(
+                scale_factor=2,
+                mode='nearest',
+                align_corners=None),
+        nn.Conv2d(64, 4, 3, 1, 1),
+        nn.BatchNorm2d(4),
+        # nn.ReLU(),
+        )
+
+
+    def forward(self, x):
+        encoded_x = self.encoder(x)
+        logits = rearrange(encoded_x, 'b c h w -> b (h w) c')
+        logits = self.fc(logits)
+        # encoded_x = rearrange(logits, 'b c (h w) -> b c h w', h=4, w=32)
+        reconstructed_x = self.decoder(encoded_x)
+        return reconstructed_x,logits
 

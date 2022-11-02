@@ -4,7 +4,7 @@ import torch
 from einops import rearrange
 import torch.nn as nn
 
-from modules.block import GatingMlpBlock, GatingMlpBlockv2, Autoencoder, Autoencoderv2
+from modules.block import GatingMlpBlock, GatingMlpBlockv2, Autoencoder, Autoencoderv2, Autoencoderv3, Autoencoderv4
 from modules.mlp import PermutatorBlock, CycleMLP
 from modules.transformation import TPS_SpatialTransformerNetwork
 from modules.feature_extraction import (
@@ -346,6 +346,50 @@ class ExpertNet(Model):
         # return prediction  # [b, num_steps, opt.num_class]
         return {"predict": prediction, "feature": contextual_feature, "gate_feature":gate_feature}
 
+class ExpertNetv2(Model):
+    def __init__(self, opt, SelfSL_layer=False):
+        super(ExpertNetv2, self).__init__(opt)
+        self.opt = opt
+        self.model = Model_Extractor(opt)
+        self.SequenceModeling_output = self.model.SequenceModeling_output
+        self.stages = {
+            # "Trans": opt.Transformation,
+            # "Feat": opt.FeatureExtraction,
+            # "Seq": opt.SequenceModeling,
+            "Pred": opt.Prediction,
+        }
+        if self.opt.FeatureExtraction == "VGG":
+            self.patch = 63
+        elif self.opt.FeatureExtraction == "SVTR":
+            self.patch = 64
+        elif self.opt.FeatureExtraction == "ResNet":
+            self.patch = 65
+        # self.gate = Autoencoderv4()
+        # self.gate = Autoencoderv3()
+        self.fc = None
+        self.Prediction = None
+
+
+    def forward(self, image, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        contextual_feature = self.model(image)
+        # gate_feature = self.gate(contextual_feature)
+        # gate_feature,gate_logits = self.gate(image)
+        """ Prediction stage """
+        if self.stages["Pred"] == "CTC":
+            prediction = self.Prediction(contextual_feature.contiguous())
+        else:
+            prediction = self.Prediction(
+                contextual_feature.contiguous(),
+                text,
+                is_train,
+                batch_max_length=self.opt.batch_max_length,
+            )
+
+        # return prediction  # [b, num_steps, opt.num_class]
+        return {"predict": prediction, "feature": contextual_feature}
+
+
 
 class DERNet(Model):
     def __init__(self, opt):
@@ -472,7 +516,7 @@ class Ensemble(nn.Module):
             self.patch = 64
         elif self.opt.FeatureExtraction == "ResNet":
             self.patch = 65
-        self.mlp = "gmlpv2"  #gmlp | vip | gmlpv2 |
+        self.mlp = "autoencoder"  #gmlp | vip | gmlpv2 | autoencoder
         self.layer_num = 1
         self.beta = 1
 
@@ -495,8 +539,8 @@ class Ensemble(nn.Module):
             index = None
         # elif is_train == False:
         #     features, index = self.cross_test(image)
-        # elif is_train == False:
-        #     features, index = self.cross_forward_expert(image, text, is_train)
+        elif is_train == False:
+            features, index = self.cross_forward_expert(image, text, is_train)
         else:
             # features,index = self.cross_forwardv2(image)
             features, index = self.cross_forward_dim3(image,text,is_train)
@@ -548,11 +592,12 @@ class Ensemble(nn.Module):
         features = [convnet(image,text,is_train) for convnet in self.model]
         route_info = torch.stack([feature["feature"] for feature in features], 1)
         route_info = self.mlp3d(route_info)
-        route_info = rearrange(route_info,'b i t (h k) -> b i h (t k)',h=64)
-        # route_info = rearrange(route_info, 'b i t c -> b t (i c)')
-        route_info = self.route(route_info).mean(-1)
-        route_info = rearrange(route_info, 'b i h -> b (i h)')
-        index = self.channel_route(route_info)
+        route_info = rearrange(route_info, 'b h w c -> b w (h c)')
+        route_info = self.channel_route(route_info)
+        # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
+        index = self.route(route_info.permute(0, 2, 1).contiguous())
+        # index = self.softargmax1d(torch.squeeze(index, -1),self.beta)
+        index = torch.squeeze(index, -1)
         index = torch.max(index, -1)[1]
 
         # index [B,I]
@@ -696,6 +741,8 @@ class Ensemble(nn.Module):
             block = PermutatorBlock(self.out_dim, 2, taski = len(self.model), patch = self.patch)
         elif self.mlp == "gmlpv2":
             block = GatingMlpBlockv2(self.out_dim, self.out_dim * 2, self.patch,len(self.model))
+        elif self.mlp == 'autoencoder':
+            block = Autoencoder(self.out_dim, self.patch, len(self.model))
         else:
             block = nn.Linear(self.out_dim, self.out_dim )
         layers=[]
@@ -881,11 +928,11 @@ class Expert_Gate(Ensemble):
         # loss = self.loss(image,gate_feature)
         loss = torch.stack([self.loss(image,gate_f) for gate_f in gate_feature], 1)
         loss = loss.mean(-1).mean(-1).mean(-1)
-
-        output = torch.stack([normal_feat[index][i] for i, index in enumerate(loss.argmax(-1))], 0)
+        output = torch.stack([normal_feat[index][i] for i, index in enumerate(loss.argmin(-1))], 0)
+        print(loss.argmin(-1))
 
         # predict = index
-        return output, origin_feature, gate_feature[-1]
+        return output, loss.argmax(-1), gate_feature[-1]
 
 
     def update_fc(self, hidden_size, nb_classes, device=None):
@@ -902,3 +949,93 @@ class Expert_Gate(Ensemble):
         # self.channel_route = nn.Linear(self.feature_dim, len(self.model))
 
 
+class Expert_Gatev2(Ensemble):
+    def __init__(self, opt):
+        super(Expert_Gatev2, self).__init__(opt)
+        self.model = nn.ModuleList()
+        self.gate = nn.ModuleList()
+        self.out_dim=None
+        self.fc = None
+        self.opt = opt
+        self.task_sizes = []
+        if self.opt.FeatureExtraction == "VGG":
+            self.patch = 63
+        elif self.opt.FeatureExtraction == "SVTR":
+            self.patch = 64
+        elif self.opt.FeatureExtraction == "ResNet":
+            self.patch = 65
+        self.mlp = "gmlpv2"  #gmlp | vip | gmlpv2 |
+        self.layer_num = 1
+        self.beta = 1
+        self.loss = nn.MSELoss(reduction="none")
+
+    def forward(self, image, cross=True, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        # # features = [convnet(image) for convnet in self.model]
+        # predict = self.model[-1](image, text, is_train)["predict"]
+        #
+        # logits = [convnet(image, text, is_train) for convnet in self.model]
+        # # features = torch.stack([feature["feature"] for feature in logits], 1)
+        # features = torch.stack([feature["gate_feature"] for feature in logits], 1)
+
+            # gate_feature = self.model[-1](image, text, is_train)["gate_feature"]
+        if is_train == False:
+            predict,feature, gate_feature= self.expert_test(image, text, is_train)
+            gate_logits = None
+        else:
+            output = self.model[-1](image, text, is_train)
+            predict = output["predict"]
+            feature = output["feature"]
+            gate_feature,gate_logits = self.gate[-1](image)
+            # predict = self.model[-1](image, text, is_train)["predict"]
+            # feature = self.model[-1](image, text, is_train)["feature"]
+            # gate_feature = self.gate[-1](feature)
+        # else:
+        #     predict,feature, gate_feature= self.expert_gate_train(image, text, is_train)
+
+        out = dict({"logits": predict, "feature": feature, "gate_feature": gate_feature , "gate_logits":gate_logits})
+
+        return out  # [b, num_steps, opt.num_class]
+
+
+    def expert_test(self,image, text, is_train):
+        # gate_feature, gate_logits = self.gate[-1](image)
+        features = [convnet(image, text, is_train) for convnet in self.model]
+        # gate_feature = torch.stack([feature["gate_feature"] for feature in features], 0)
+        # origin_feature = torch.stack([feature["feature"] for feature in features], 0)
+        gate_feature = torch.stack([expert_gate(image)[0] for i,expert_gate in enumerate(self.gate)],0)
+        # predict = [feature["predict"] for feature in features]
+
+        # feature_array = torch.stack(features, 1)
+        predict = [feature["predict"] for feature in features]
+        B,T,C = predict[-1].size()
+        list_len = len(predict)
+        normal_feat = []
+        for i in range(list_len-1):
+            feat = self.pad_zeros_features(predict[i],total=C)
+            normal_feat.append(feat)
+        normal_feat.append(predict[-1])
+
+        # loss = self.loss(image,gate_feature)
+        loss = torch.stack([self.loss(image,gate_f) for gate_f in gate_feature], 1)
+        loss = loss.mean(-1).mean(-1).mean(-1)
+        output = torch.stack([normal_feat[index][i] for i, index in enumerate(loss.argmin(-1))], 0)
+        print(loss.argmin(-1))
+
+        # predict = index
+        return output, loss.argmax(-1), gate_feature[-1]
+
+
+    def update_fc(self, hidden_size, nb_classes, device=None):
+        self.model.append(ExpertNetv2(self.opt))
+        self.model[-1].new_fc(hidden_size, nb_classes)
+        self.gate.append(Autoencoderv4(nb_classes))
+        # self.model[-1].load_state_dict(self.model[-2].state_dict())
+
+        if self.out_dim is None:
+            self.out_dim = self.model[-1].SequenceModeling_output
+        #
+        # block = Autoencoder(self.patch * self.out_dim)
+        # self.gate.append(block)
+        # self.route = nn.Linear(self.patch, 1)
+        # self.channel_route = nn.Linear(self.feature_dim, len(self.model))
