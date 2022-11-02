@@ -840,7 +840,7 @@ class Expert_Gate(Ensemble):
         self.mlp = "gmlpv2"  #gmlp | vip | gmlpv2 |
         self.layer_num = 1
         self.beta = 1
-        self.loss = nn.MSELoss(reduction=None)
+        self.loss = nn.MSELoss(reduction="none")
 
     def forward(self, image, cross=True, text=None, is_train=True, SelfSL_layer=False):
         """Transformation stage"""
@@ -864,13 +864,28 @@ class Expert_Gate(Ensemble):
 
     def expert_test(self,image, text, is_train):
         features = [convnet(image,text,is_train) for convnet in self.model]
-        gate_feature = torch.stack([feature["gate_feature"] for feature in features], 1)
-        origin_feature = torch.stack([feature["feature"] for feature in features], 1)
-        predict = torch.stack([feature["predict"] for feature in features], 1)
+        gate_feature = torch.stack([feature["gate_feature"] for feature in features], 0)
+        origin_feature = torch.stack([feature["feature"] for feature in features], 0)
+        # predict = [feature["predict"] for feature in features]
+
+        # feature_array = torch.stack(features, 1)
+        predict = [feature["predict"] for feature in features]
+        B,T,C = predict[-1].size()
+        list_len = len(predict)
+        normal_feat = []
+        for i in range(list_len-1):
+            feat = self.pad_zeros_features(predict[i],total=C)
+            normal_feat.append(feat)
+        normal_feat.append(predict[-1])
+
         # loss = self.loss(image,gate_feature)
-        loss = torch.stack([self.loss(image,gate_f) for gate_f in gate_feature], 0)
+        loss = torch.stack([self.loss(image,gate_f) for gate_f in gate_feature], 1)
+        loss = loss.mean(-1).mean(-1).mean(-1)
+
+        output = torch.stack([normal_feat[index][i] for i, index in enumerate(loss.argmax(-1))], 0)
+
         # predict = index
-        return predict, origin_feature, gate_feature
+        return output, origin_feature, gate_feature[-1]
 
 
     def update_fc(self, hidden_size, nb_classes, device=None):

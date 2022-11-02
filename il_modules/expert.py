@@ -175,8 +175,8 @@ class Expert(BaseLearner):
         self.build_optimizer(filtered_parameters)
 
         self._train(0, taski, train_loader, valid_loader,step=0)
-        if taski >0:
-            self._train(0, taski, train_loader, valid_loader, step=1)
+        # if taski >0:
+        #     self._train(0, taski, train_loader, valid_loader, step=1)
 
 
     def build_rehearsal_memory(self,train_loader,taski):
@@ -445,7 +445,7 @@ class Expert(BaseLearner):
                 name = opt.lan_list[taski]
             torch.save(
                 self.model.state_dict(),
-                f"./saved_models/{opt.exp_name}/{name}_{taski}_{step}_best_score.pth",
+                f"./saved_models/{opt.exp_name}/{name}_{taski}_best_score.pth",
             )
 
         # validation log: loss, lr, score (accuracy or norm ED), time.
@@ -494,7 +494,7 @@ class Expert(BaseLearner):
             name = self.opt.ch_list[taski]
         else:
             name = self.opt.lan_list[taski]
-        saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_{step}_best_score.pth"
+        saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_best_score.pth"
         # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
         self.model.load_state_dict(torch.load(f"{saved_best_model}"),strict=True)
 
