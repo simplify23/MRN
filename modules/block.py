@@ -151,20 +151,20 @@ class CBAM(nn.Module):
         return out
 
 class Autoencoder(nn.Module):
-    def __init__(self, out_dim, patch, taski,hidden_dim=512):
+    def __init__(self, out_dim, patch, taski, hidden_dim=100):
         super(Autoencoder, self).__init__()
         self.encoder = nn.Sequential(
-        nn.Linear(out_dim, 512),
+        nn.Linear(out_dim * patch * taski , hidden_dim),
         nn.ReLU())
         self.decoder = nn.Sequential(
-        nn.Linear(hidden_dim, out_dim),
+        nn.Linear(hidden_dim, taski),
         nn.Sigmoid())
 
 
     def forward(self, x):
         B, H, W, C = x.shape
         # return x
-        # x = rearrange(x, 'b i w c -> b i (w c)')
+        x = rearrange(x, 'b i w c -> b (i w c)')
         encoded_x = self.encoder(x)
         reconstructed_x = self.decoder(encoded_x)
         # reconstructed_x = rearrange(reconstructed_x, 'b i (w c) -> b i w c',w=W, c=C)

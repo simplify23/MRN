@@ -884,7 +884,7 @@ class Ensemble_exp(Ensemble):
             self.patch = 64
         elif self.opt.FeatureExtraction == "ResNet":
             self.patch = 65
-        self.mlp = "LPN"  #gmlp | vip | gmlpv2 | autoencoder
+        self.mlp = "autoencoder"  #gmlp | vip | gmlpv2 | autoencoder
         self.layer_num = 1
         self.beta = 1
 
@@ -980,6 +980,8 @@ class Ensemble_exp(Ensemble):
 
         if self.mlp == "LPN":
             block = LanguagePredictionNetwork(len(self.model))
+        elif self.mlp == "autoencoder":
+            block = Autoencoder(self.out_dim, 64, len(self.model))
         else:
             block = nn.Linear(self.out_dim, self.out_dim )
         layers=[]
