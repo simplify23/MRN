@@ -365,7 +365,7 @@ class ExpertNetv2(Model):
             self.patch = 64
         elif self.opt.FeatureExtraction == "ResNet":
             self.patch = 65
-        # self.gate = Autoencoderv4()
+        self.gate = Autoencoderv4()
         # self.gate = Autoencoderv3()
         self.fc = None
         self.Prediction = None
@@ -374,7 +374,7 @@ class ExpertNetv2(Model):
     def forward(self, image, text=None, is_train=True, SelfSL_layer=False):
         """Transformation stage"""
         contextual_feature = self.model(image)
-        # gate_feature = self.gate(contextual_feature)
+        gate_feature = self.gate(image)
         # gate_feature,gate_logits = self.gate(image)
         """ Prediction stage """
         if self.stages["Pred"] == "CTC":
@@ -388,7 +388,7 @@ class ExpertNetv2(Model):
             )
 
         # return prediction  # [b, num_steps, opt.num_class]
-        return {"predict": prediction, "feature": contextual_feature}
+        return {"predict": prediction, "feature": contextual_feature,'gate_feature':gate_feature}
 
 
 
@@ -1104,19 +1104,19 @@ class Expert_Gatev2(Ensemble):
             # gate_feature = self.model[-1](image, text, is_train)["gate_feature"]
         if is_train == False:
             predict,feature, gate_feature= self.expert_test(image, text, is_train)
-            gate_logits = None
         else:
             output = self.model[-1](image, text, is_train)
             predict = output["predict"]
             feature = output["feature"]
-            gate_feature,gate_logits = self.gate[-1](image)
+            gate_feature = output['gate_feature']
+            # gate_feature,gate_logits = self.gate[-1](image)
             # predict = self.model[-1](image, text, is_train)["predict"]
             # feature = self.model[-1](image, text, is_train)["feature"]
             # gate_feature = self.gate[-1](feature)
         # else:
         #     predict,feature, gate_feature= self.expert_gate_train(image, text, is_train)
 
-        out = dict({"logits": predict, "feature": feature, "gate_feature": gate_feature , "gate_logits":gate_logits})
+        out = dict({"logits": predict, "feature": feature, "gate_feature": gate_feature })
 
         return out  # [b, num_steps, opt.num_class]
 
@@ -1124,9 +1124,9 @@ class Expert_Gatev2(Ensemble):
     def expert_test(self,image, text, is_train):
         # gate_feature, gate_logits = self.gate[-1](image)
         features = [convnet(image, text, is_train) for convnet in self.model]
-        # gate_feature = torch.stack([feature["gate_feature"] for feature in features], 0)
+        gate_feature = torch.stack([feature["gate_feature"] for feature in features], 0)
         # origin_feature = torch.stack([feature["feature"] for feature in features], 0)
-        gate_feature = torch.stack([expert_gate(image)[0] for i,expert_gate in enumerate(self.gate)],0)
+        # gate_feature = torch.stack([expert_gate(image)[0] for i,expert_gate in enumerate(self.gate)],0)
         # predict = [feature["predict"] for feature in features]
 
         # feature_array = torch.stack(features, 1)

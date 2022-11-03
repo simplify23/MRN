@@ -124,15 +124,15 @@ class ChannelAttentionModule(nn.Module):
 class SpatialAttentionModule(nn.Module):
     def __init__(self):
         super(SpatialAttentionModule, self).__init__()
-        self.fusion = nn.Linear(2, 1)
+        self.conv2d = nn.Conv2d(in_channels=2, out_channels=1, kernel_size=3, stride=1, padding=1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         # map尺寸不变，缩减通道
         avgout = torch.mean(x, dim=1, keepdim=True)
         maxout, _ = torch.max(x, dim=1, keepdim=True)
-        out = torch.cat([avgout, maxout], dim=1).permute(0,2,1)
-        out = self.sigmoid(self.fusion(out))
+        out = torch.cat([avgout, maxout], dim=1)
+        out = self.sigmoid(self.conv2d(out))
         return out
 
 
@@ -148,6 +148,8 @@ class CBAM(nn.Module):
     def forward(self, x):
         out = self.channel_attention(x) * x
         out = self.spatial_attention(out) * out
+        if self.ratio<0:
+            out = self.down(out).squeeze(1)
         return out
 
 class Autoencoder(nn.Module):
@@ -279,6 +281,8 @@ class Autoencoderv4(nn.Module):
             # nn.Sigmoid()
         )
         # self.fc =
+
+        self.atten = CBAM(64)
         self.encoder = nn.Sequential(
         nn.Conv2d(4, 64, 3, 2, 1),
         nn.BatchNorm2d(64),
@@ -289,14 +293,14 @@ class Autoencoderv4(nn.Module):
         nn.Conv2d(64, 64, 3, 2, 1),
         nn.BatchNorm2d(64),
         nn.ReLU(),
-        nn.Conv2d(64, 64, (1,3), (1,2), 1),
-        nn.BatchNorm2d(64),
-        nn.ReLU(),
+        # nn.Conv2d(64, 64, (1,3), (1,2), 1),
+        # nn.BatchNorm2d(64),x
+        # nn.ReLU(),
         )
         self.decoder = nn.Sequential(
         nn.Upsample(
-                size=(8,64),
-                # scale_factor=(2,4),
+                # size=(8,64),
+                scale_factor=2,
                 mode='nearest',
                 align_corners=None),
         nn.Conv2d(64, 64, 3, 1, 1),
@@ -321,11 +325,11 @@ class Autoencoderv4(nn.Module):
 
     def forward(self, x):
         encoded_x = self.encoder(x)
-        logits = rearrange(encoded_x, 'b c h w -> b (h w) c')
-        logits = self.fc(logits)
-        # encoded_x = rearrange(logits, 'b c (h w) -> b c h w', h=4, w=32)
+        # logits = rearrange(encoded_x, 'b c h w -> b (h w) c')
+        encoded_x = self.atten(encoded_x)
+        # encoded_x = rearrange(logits, 'b c (h w) -z> b c h w', h=4, w=32)
         reconstructed_x = self.decoder(encoded_x)
-        return reconstructed_x,logits
+        return reconstructed_x
 
 
 class LanguagePredictionNetwork(nn.Module):

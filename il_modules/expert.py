@@ -229,13 +229,14 @@ class Expert(BaseLearner):
                 'Task {} start training for model ------{}------'.format(taski, self.opt.exp_name)
             )
             """ start training """
-            treadness = 1.0
-            self.train_autoencoder(start_iter, taski, train_loader, valid_loader.create_dataset(), cross=False)
-            self.freeze_step1(taski)
-            if treadness>0.85:
-                self._init_train(start_iter, taski, train_loader, valid_loader.create_dataset(), cross=False)
-            else:
-                self._update_representation(start_iter, taski, train_loader, valid_loader.create_dataset(), cross=True)
+            self._init_train(start_iter, taski, train_loader, valid_loader.create_dataset(), cross=False)
+            # treadness = 1.0
+            # self.train_autoencoder(start_iter, taski, train_loader, valid_loader.create_dataset(), cross=False)
+            # self.freeze_step1(taski)
+            # if treadness>0.85:
+            #     self._init_train(start_iter, taski, train_loader, valid_loader.create_dataset(), cross=False)
+            # else:
+            #     self._update_representation(start_iter, taski, train_loader, valid_loader.create_dataset(), cross=True)
             # if taski == 0:
             #     # valid_loader = valid_loader.create_dataset()
             #     self._init_train(start_iter,taski, train_loader, valid_loader.create_dataset(),cross=False)
@@ -278,7 +279,7 @@ class Expert(BaseLearner):
             if "CTC" in self.opt.Prediction:
                 output = self.model(image,cross)
                 preds = output["logits"]
-                # taski_loss = output["gate_feature"]
+                taski_loss = self.criterion2(image,output["gate_feature"])
                 # preds = self.model(image)
                 preds_size = torch.IntTensor([preds.size(1)] * batch_size)
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
@@ -286,14 +287,14 @@ class Expert(BaseLearner):
             else:
                 output = self.model(image, cross,labels_index[:, :-1])  # align with Attention.forward
                 preds = output["logits"]
-                # taski_loss = self.criterion2(image, output["gate_feature"])
+                taski_loss = self.criterion2(image, output["gate_feature"])
                 # taski_loss = output["loss"]
                 target = labels_index[:, 1:]  # without [SOS] Symbol
                 loss = self.criterion(
                     preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
                 )
             # loss = loss + taski_loss + taski_loss2
-            # loss = loss + taski_loss
+            loss = loss + 10 * taski_loss
             self.model.zero_grad()
             loss.backward()
             # taski_loss.backward()
@@ -303,7 +304,7 @@ class Expert(BaseLearner):
             )  # gradient clipping with 5 (Default)
             self.optimizer.step()
             train_loss_avg.add(loss)
-            train_taski_loss_avg.add(taski_loss+taski_loss2)
+            train_taski_loss_avg.add(taski_loss)
 
             if "super" in self.opt.schedule:
                 self.scheduler.step()
@@ -312,7 +313,7 @@ class Expert(BaseLearner):
 
             # validation part.
             # To see training progress, we also conduct validation when 'iteration == 1'
-            if iteration % self.opt.val_interval == 0 or iteration ==int(self.opt.num_iter)//4:
+            if iteration % self.opt.val_interval == 0 or iteration ==int(self.opt.num_iter)-1:
                 # for validation log
                 # print("66666666")
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
