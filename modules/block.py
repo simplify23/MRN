@@ -332,7 +332,7 @@ class LanguagePredictionNetwork(nn.Module):
     def __init__(self,taski,input_h=4,input_w=16):
         super(LanguagePredictionNetwork, self).__init__()
         fc1_in = (input_h // 4) * (input_w // 4) * 32
-        self.conv_t = nn.Conv2d(256 * taski, 256, 1, 1, 0)
+        self.conv_t = nn.Linear(256 * taski, 256)
         self.conv1 = nn.Conv2d(256, 64, 2, 2, 0)
         # self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.conv2 = nn.Conv2d(64, 32, 2, 2, 0)
@@ -341,10 +341,11 @@ class LanguagePredictionNetwork(nn.Module):
 
     def forward(self, x):
         # b w c i
-        x = rearrange(x,"b (h w) c i -> b (c i) h w ",h=4,w=16)
+        x = rearrange(x,"b t c i -> b t (c i)")
         x = self.conv_t(x)
+        x = rearrange(x, "b (h w) c  -> b c h w ", h=4, w=16)
         x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv2(x)).contiguous()
         x = x.view(x.size(0), -1)
         x = F.relu(self.fc1(x))
         # [n, 64] => [n, num_class]
