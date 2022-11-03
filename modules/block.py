@@ -4,6 +4,7 @@ import einops
 import torch
 import torch.nn as nn
 from einops import rearrange
+import torch.nn.functional as F
 
 class SpatialGatingUnit(nn.Module):
     def __init__(self, d_ffn, seq_len):
@@ -325,4 +326,29 @@ class Autoencoderv4(nn.Module):
         # encoded_x = rearrange(logits, 'b c (h w) -> b c h w', h=4, w=32)
         reconstructed_x = self.decoder(encoded_x)
         return reconstructed_x,logits
+
+
+class LanguagePredictionNetwork(nn.Module):
+    def __init__(self,taski,input_h=4,input_w=16):
+        super(LanguagePredictionNetwork, self).__init__()
+        fc1_in = (input_h // 4) * (input_w // 4) * 32
+        self.conv_t = nn.Conv2d(256 * taski, 256, 1, 1, 0)
+        self.conv1 = nn.Conv2d(256, 64, 2, 2, 0)
+        # self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv2 = nn.Conv2d(64, 32, 2, 2, 0)
+        self.fc1 = nn.Linear(fc1_in, 64)
+        self.fc2 = nn.Linear(64, taski)
+
+    def forward(self, x):
+        # b w c i
+        x = rearrange(x,"b (h w) c i -> b (c i) h w ",h=4,w=16)
+        x = self.conv_t(x)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc1(x))
+        # [n, 64] => [n, num_class]
+        x = self.fc2(x)
+
+        return x
 

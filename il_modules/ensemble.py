@@ -16,7 +16,7 @@ from torch.autograd import Variable
 from data.dataset import hierarchical_dataset
 from il_modules.base import BaseLearner
 from il_modules.der import DER
-from modules.model import DERNet, Ensemble
+from modules.model import DERNet, Ensemble, Ensemble_exp
 from test import validation
 from tools.utils import Averager, adjust_learning_rate
 
@@ -42,8 +42,8 @@ class Ensem(BaseLearner):
 
     def __init__(self, opt):
         super().__init__(opt)
-        # self.model = Ensemblev2(opt)
-        self.model = Ensemble(opt)
+        self.model = Ensemble_exp(opt)
+        # self.model = Ensemble(opt)
 
     def after_task(self):
         # will we need this line ? (AB Study)

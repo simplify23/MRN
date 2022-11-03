@@ -229,11 +229,13 @@ class Expert(BaseLearner):
                 'Task {} start training for model ------{}------'.format(taski, self.opt.exp_name)
             )
             """ start training """
-            if step == 0:
+            treadness = 1.0
+            self.train_autoencoder(start_iter, taski, train_loader, valid_loader.create_dataset(), cross=False)
+            self.freeze_step1(taski)
+            if treadness>0.85:
                 self._init_train(start_iter, taski, train_loader, valid_loader.create_dataset(), cross=False)
-            # elif step == 1:
-            #     self.freeze_step1(taski)
-            #     self._update_representation(start_iter, taski, train_loader, valid_loader.create_dataset(), cross=True)
+            else:
+                self._update_representation(start_iter, taski, train_loader, valid_loader.create_dataset(), cross=True)
             # if taski == 0:
             #     # valid_loader = valid_loader.create_dataset()
             #     self._init_train(start_iter,taski, train_loader, valid_loader.create_dataset(),cross=False)
@@ -250,6 +252,7 @@ class Expert(BaseLearner):
                 # self.model.module.weight_align(self._total_classes - self._known_classes)
 
     def _init_train(self,start_iter,taski, train_loader, valid_loader,cross=False):
+        # fine-tuning
         # loss averager
         train_loss_avg = Averager()
         train_taski_loss_avg = Averager()
@@ -276,14 +279,10 @@ class Expert(BaseLearner):
                 output = self.model(image,cross)
                 preds = output["logits"]
                 # taski_loss = output["gate_feature"]
-                taski_loss = self.criterion2(image, output["gate_feature"])
-                preds_log_softmax2 = output["gate_logits"].log_softmax(2).permute(1, 0, 2)
-
                 # preds = self.model(image)
                 preds_size = torch.IntTensor([preds.size(1)] * batch_size)
                 preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
                 loss = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
-                taski_loss2 = self.criterion(preds_log_softmax2, labels_index, preds_size, labels_length)
             else:
                 output = self.model(image, cross,labels_index[:, :-1])  # align with Attention.forward
                 preds = output["logits"]
@@ -293,7 +292,7 @@ class Expert(BaseLearner):
                 loss = self.criterion(
                     preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
                 )
-            loss = loss + taski_loss + taski_loss2
+            # loss = loss + taski_loss + taski_loss2
             # loss = loss + taski_loss
             self.model.zero_grad()
             loss.backward()
@@ -338,6 +337,7 @@ class Expert(BaseLearner):
         self.model.module.model[-1].eval()
 
     def _update_representation(self,start_iter, taski, train_loader, valid_loader, cross=False):
+        # kd loss
         # loss averager
         train_loss_avg = Averager()
         # train_taski_loss_avg = Averager()
@@ -351,8 +351,8 @@ class Expert(BaseLearner):
 
         # training loop
         for iteration in tqdm(
-                range(start_iter + 1, int(self.opt.num_iter // 2) + 1),
-                total=int(self.opt.num_iter//2),
+                range(start_iter + 1, int(self.opt.num_iter) + 1),
+                total=int(self.opt.num_iter),
                 position=0,
                 leave=True,
         ):
@@ -366,25 +366,32 @@ class Expert(BaseLearner):
 
             # default recognition loss part
             if "CTC" in self.opt.Prediction:
-                output = self.model(image, cross)
-                # preds = output["logits"]
-                # taski_loss = output["gate_feature"]
-                loss = self.criterion2(image, output["gate_feature"])
-                # preds = self.model(image)
-                # preds_size = torch.IntTensor([preds.size(1)] * batch_size)
-                # preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
-                # loss = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
+                start_index = 0
+                preds = self.model(image)["logits"]
+                old_preds = self._old_network(image)["logits"]
+                preds_size = torch.IntTensor([preds.size(1)] * batch_size)
+                # B，T，C(max) -> T, B, C
+                preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
+                loss_clf = self.criterion(preds_log_softmax, labels_index, preds_size, labels_length)
             else:
-                output = self.model(image, cross, labels_index[:, :-1])  # align with Attention.forward
-                # preds = output["logits"]
-                loss = self.criterion2(image, output["gate_feature"])
-                # taski_loss = output["loss"]
-                # target = labels_index[:, 1:]  # without [SOS] Symbol
-                # loss = self.criterion(
-                #     preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
-                # )
-            # loss = loss
-            # loss = loss + taski_loss
+                start_index = 1
+                preds = self.model(image, labels_index[:, :-1], True)["logits"]  # align with Attention.forward
+                old_preds = self._old_network(image, labels_index[:, :-1], True)["logits"]
+                target = labels_index[:, 1:]  # without [SOS] Symbol
+                loss_clf = self.criterion(
+                    preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
+                )
+
+            # fake_targets = self._total_classes - self._known_classes
+            # loss_clf = F.cross_entropy(
+            #     preds_log_softmax[:, self._known_classes:], fake_targets
+            # )
+            loss_kd = _KD_loss(
+                preds.view(-1, preds.shape[-1])[:, start_index: self._known_classes],
+                old_preds.view(-1, old_preds.shape[-1])[:, start_index: self._known_classes],
+                T,
+            )
+            loss = loss_kd + loss_clf
             self.model.zero_grad()
             loss.backward()
             # taski_loss.backward()
@@ -541,5 +548,10 @@ class Expert(BaseLearner):
             self.write_data_log(f'{taski} Avg Acc: {best_scores[taski]:0.2f} \n  acc: {task_accs}\n')
         return best_scores,ned_scores
 
+
+def _KD_loss(pred, soft, T):
+    pred = torch.log_softmax(pred / T, dim=1)
+    soft = torch.softmax(soft / T, dim=1)
+    return -1 * torch.mul(soft, pred).sum() / pred.shape[0]
 
 

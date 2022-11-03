@@ -4,7 +4,8 @@ import torch
 from einops import rearrange
 import torch.nn as nn
 
-from modules.block import GatingMlpBlock, GatingMlpBlockv2, Autoencoder, Autoencoderv2, Autoencoderv3, Autoencoderv4
+from modules.block import GatingMlpBlock, GatingMlpBlockv2, Autoencoder, Autoencoderv2, Autoencoderv3, Autoencoderv4, \
+    LanguagePredictionNetwork
 from modules.mlp import PermutatorBlock, CycleMLP
 from modules.transformation import TPS_SpatialTransformerNetwork
 from modules.feature_extraction import (
@@ -868,6 +869,126 @@ class Ensemble(nn.Module):
     #     self.eval()
     #
     #     return self
+
+class Ensemble_exp(Ensemble):
+    def __init__(self, opt):
+        super(Ensemble_exp, self).__init__(opt)
+        self.model = nn.ModuleList()
+        self.out_dim=None
+        self.fc = None
+        self.opt = opt
+        self.task_sizes = []
+        if self.opt.FeatureExtraction == "VGG":
+            self.patch = 63
+        elif self.opt.FeatureExtraction == "SVTR":
+            self.patch = 64
+        elif self.opt.FeatureExtraction == "ResNet":
+            self.patch = 65
+        self.mlp = "LPN"  #gmlp | vip | gmlpv2 | autoencoder
+        self.layer_num = 1
+        self.beta = 1
+
+    def forward(self, image, cross = True,text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        # features = [convnet(image) for convnet in self.model]
+        if cross==False:
+            features = self.model[-1](image,text,is_train)["predict"]
+            index = None
+        # elif is_train == False:
+        #     features, index = self.cross_test(image)
+        elif is_train == False:
+            features, index = self.cross_forward_expert(image, text, is_train)
+        else:
+            # features,index = self.cross_forwardv2(image)
+            features, index = self.cross_forward_dim3(image,text,is_train)
+        # out=self.fc(features) #{logics: self.fc(features)}
+        out = dict({"logits":features,"index":index,"aux_logits":None})
+
+        return out  # [b, num_steps, opt.num_class]
+
+
+    def cross_test(self, image, text=None, is_train=False, SelfSL_layer=False):
+        return self.cross_forward(image, text=None, is_train=False, SelfSL_layer=False)
+
+    def cross_forward_expert(self, image, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        features = [convnet(image,text,is_train) for convnet in self.model]
+        route_info = torch.stack([feature["feature"] for feature in features], -1)
+        route_info = rearrange(route_info,"b t c i -> b c i t")
+        route_info = self.route(route_info)
+        route_info = rearrange(route_info, "b c i t -> b t c i")
+        index = self.mlp3d(route_info)
+        index = torch.max(index, -1)[1]
+
+        # index [B,I]
+        # route_info [B,T,I]
+
+        # feature_array = torch.stack(features, 1)
+        features = [feature["predict"] for feature in features]
+        B, T, C = features[-1].size()
+        list_len = len(features)
+        normal_feat = []
+        for i in range(list_len - 1):
+            feat = self.pad_zeros_features(features[i], total=C)
+            normal_feat.append(feat)
+        normal_feat.append(features[-1])
+        normal_feat = torch.stack(normal_feat, 0)
+        # normal_feat [I,B,T,C] -> [T,C,B,I] -> [B,T,C,I]
+        output = torch.stack([normal_feat[index_one][i,:,:]for i,index_one in enumerate(index)],0)
+
+        return output.contiguous(),index
+
+    def cross_forward_dim3(self, image, text=None, is_train=True, SelfSL_layer=False):
+        """Transformation stage"""
+        features = [convnet(image,text,is_train) for convnet in self.model]
+        route_info = torch.stack([feature["feature"] for feature in features], -1)
+        route_info = rearrange(route_info,"b t c i -> b c i t")
+        route_info = self.route(route_info)
+        route_info = rearrange(route_info, "b c i t -> b t c i")
+        index = self.mlp3d(route_info)
+        index = self.softargmax1d(index,self.beta)
+        # index [B,I]
+        # route_info [B,T,I]
+
+        # feature_array = torch.stack(features, 1)
+        features = [feature["predict"] for feature in features]
+        B, T, C = features[-1].size()
+        list_len = len(features)
+        normal_feat = []
+        for i in range(list_len - 1):
+            feat = self.pad_zeros_features(features[i], total=C)
+            normal_feat.append(feat)
+        normal_feat.append(features[-1])
+        normal_feat = torch.stack(normal_feat, 0)
+        # normal_feat [I,B,T,C] -> [T,C,B,I] -> [B,T,C,I]
+        output = (normal_feat.permute(2, 3, 1, 0) * index).permute(2, 0, 1, 3).contiguous()
+        # output = (normal_feat.permute(3,1,2,0) * route_info).permute(1,2,0,3).contiguous()
+
+        return torch.sum(output, -1), index
+
+    def build_fc(self, hidden_size, nb_classes,device=None):
+        self.update_fc(hidden_size, nb_classes,device=None)
+
+    def update_fc(self, hidden_size, nb_classes,device=None):
+        self.model.append(Model(self.opt))
+        self.model[-1].new_fc(hidden_size,nb_classes)
+            # self.model[-1].load_state_dict(self.model[-2].state_dict())
+
+        if self.out_dim is None:
+            self.out_dim=self.model[-1].SequenceModeling_output
+        self.route = nn.Linear(self.patch, 64)
+
+        if self.mlp == "LPN":
+            block = LanguagePredictionNetwork(len(self.model))
+        else:
+            block = nn.Linear(self.out_dim, self.out_dim )
+        layers=[]
+        for _ in range(self.layer_num):
+            layers.append(block)
+        print("mlp {} has {} layers".format(block, len(layers)))
+        self.mlp3d = nn.Sequential(*layers)
+
+
 
 class Expert_Gate(Ensemble):
     def __init__(self, opt):
