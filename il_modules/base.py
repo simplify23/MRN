@@ -8,15 +8,11 @@ import torch.backends.cudnn as cudnn
 import torch.nn.init as init
 import torch.utils.data
 import numpy as np
-from mmcv import Config
 from tqdm import tqdm
-from ptflops import get_model_complexity_info
-from thop import profile
-from collections import OrderedDict
 from tools.utils import CTCLabelConverter, AttnLabelConverter, Averager, adjust_learning_rate
 from data.dataset import hierarchical_dataset, AlignCollate, Batch_Balanced_Dataset
 from modules.model import Model
-from test import validation, benchmark_all_eval
+from test import validation
 class bag_value():
     def __init__(self,bag):
         self.label, = bag

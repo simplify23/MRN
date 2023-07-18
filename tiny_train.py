@@ -8,7 +8,6 @@ from il_modules.base import BaseLearner
 from il_modules.der import DER
 from il_modules.ensemble import Ensem
 from il_modules.ewc import EWC
-from il_modules.expert import Expert
 from il_modules.joint import JointLearner
 from il_modules.lwf import LwF
 from il_modules.wa import WA
@@ -272,8 +271,6 @@ def train(opt, log):
         learner = DER(opt)
     elif opt.il == "ems":
         learner = Ensem(opt)
-    elif opt.il == "expert":
-        learner = Expert(opt)
     elif opt.il == "joint_mix" or opt.il == "joint_loader":
         learner = JointLearner(opt)
     else:

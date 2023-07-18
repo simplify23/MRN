@@ -1,12 +1,8 @@
-from collections import Callable
 import numpy as np
 import torch
 from torch import nn
 from timm.models.layers import trunc_normal_
 from functools import partial
-# from mmocr.models.builder import BACKBONES
-# from mmcv.runner import BaseModule
-# from mmcv.cnn import ConvModule
 from einops import rearrange
 
 def drop_path(x, drop_prob: float = 0., training: bool = False, scale_by_keep: bool = True):
@@ -157,68 +153,6 @@ class Attention(nn.Module):
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
-#
-# class Attention(nn.Module):
-#     def __init__(self,
-#                  dim,
-#                  num_heads=8,
-#                  mixer='Global',
-#                  HW=[8, 25],
-#                  local_k=[7, 11],
-#                  qkv_bias=False,
-#                  qk_scale=None,
-#                  attn_drop=0.,
-#                  proj_drop=0.):
-#         super().__init__()
-#         self.num_heads = num_heads
-#         head_dim = dim // num_heads
-#         self.scale = qk_scale or head_dim ** -0.5
-#
-#         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
-#         self.attn_drop = nn.Dropout(attn_drop)
-#         self.proj = nn.Linear(dim, dim)
-#         self.proj_drop = nn.Dropout(proj_drop)
-#         if mixer == 'Local':
-#             H = HW[0]
-#             W = HW[1]
-#             hk = local_k[0]
-#             wk = local_k[1]
-#             mask = np.ones([H * W, H * W])
-#             for h in range(H):
-#                 for w in range(W):
-#                     for kh in range(-(hk // 2), (hk // 2) + 1):
-#                         for kw in range(-(wk // 2), (wk // 2) + 1):
-#                             if H > (h + kh) >= 0 and W > (w + kw) >= 0:
-#                                 mask[h * W + w][(h + kh) * W + (w + kw)] = 0
-#             mask_paddle = torch.tensor(mask, dtype='float32')
-#             mask_inf = torch.full([H * W, H * W], '-inf', dtype='float32')
-#             self.mask = torch.where(mask_paddle < 1, mask_paddle, mask_inf)
-#         self.mixer = mixer
-#
-#     def forward(self, x):
-#         # B= paddle.shape(x)[0]
-#         N, C = x.shape[1:]
-#         self.N = N
-#         self.C = C
-#         qkv = self.qkv(x).reshape(-1, N, 3, self.num_heads, C //
-#                                   self.num_heads).permute(2, 0, 3, 1, 4)
-#         q, k, v = qkv[0] * self.scale, qkv[1], qkv[2]
-#
-#         attn = (q @ (k.transpose(-1, -2)))
-#         if self.mixer == 'Local':
-#             attn += self.mask
-#         attn = attn.softmax(dim=-1)
-#         attn = self.attn_drop(attn)
-#
-#         x = (attn.matmul(v)).transpose(1, 2).reshape(-1, N, C)
-#         x = self.proj(x)
-#         x = self.proj_drop(x)
-#         return x
-#
-#     def flops(self):
-#         flops = self.N * self.N * self.C * 2 + 4 * self.N * self.C * self.C
-#         return flops
-
 
 class Block(nn.Module):
     def __init__(self,
@@ -300,14 +234,6 @@ class PatchEmbed(nn.Module):
                 nn.Conv2d(embed_dim // 2, embed_dim, 3, 2, 1),
                 nn.BatchNorm2d(embed_dim),
                 nn.GELU())
-            # self.proj1 = nn.Sequential(
-            #     nn.Conv2d(in_channels, embed_dim // 2, 3, 1, 1),
-            #     nn.BatchNorm2d(embed_dim // 2),
-            #     nn.GELU())
-            # self.proj2 = nn.Sequential(
-            #     nn.Conv2d(embed_dim // 2, embed_dim, 3, 1, 1),
-            #     nn.BatchNorm2d(embed_dim),
-            #     nn.GELU())
         if sub_num == 3:
             self.proj = nn.Sequential(
                 nn.Conv2d(in_channels, embed_dim // 4, 3, 2, 1),
@@ -389,7 +315,6 @@ class SubSample(nn.Module):
         return out
 
 
-# @BACKBONES.register_module()
 class SVTR2(nn.Module):
 
     def __init__(self,
@@ -538,18 +463,6 @@ class SVTR2(nn.Module):
             # HW = [self.HW[0] // 2, self.HW[1]]
             self.sub_sample3 = SubSample(embed_dim[2], out_channels, sub_norm=sub_norm, stride=[2, 1],
                                          types=patch_merging)  # ConvBNLayer(embed_dim[0], embed_dim[1], kernel_size=3, stride=[2, 1], sub_norm=sub_norm)
-            HW = [self.HW[0] // 8, self.HW[1]]
-        else:
-            HW = self.HW
-        # if patch_merging is not None:
-        #     # self.sub_sample1 = SubSample(embed_dim[0], embed_dim[1], sub_norm=sub_norm, stride=[2, 1],
-        #     #                              types=patch_merging)  # ConvBNLayer(embed_dim[0], embed_dim[1], kernel_size=3, stride=[2, 1], sub_norm=sub_norm)
-        #     # HW = [self.HW[0] // 2, self.HW[1]]
-        #     self.sub_sample3 = SubSample(embed_dim[3], embed_dim[3], sub_norm=sub_norm, stride=[2, 2],
-        #                                  types=patch_merging)  # ConvBNLayer(embed_dim[0], embed_dim[1], kernel_size=3, stride=[2, 1], sub_norm=sub_norm)
-        #     HW = [self.HW[0] // 16, self.HW[1] // 16]
-        # else:
-        #     HW = self.HW
 
         self.last_stage = last_stage
         if last_stage:
@@ -615,25 +528,8 @@ class SVTR2(nn.Module):
             # x = self.sub_sample2(x.transpose(1, 2).reshape(B, self.embed_dim[1], self.HW[0] // 2, self.HW[1]))
             x = self.sub_sample3(x.transpose(1, 2).reshape(B, self.embed_dim[2], self.HW[0] // 4, self.HW[1]))
         x = x.permute(0, 2, 1).reshape([-1, self.out_channels, self.HW[0] // 8, self.HW[1]])
-        # for blk in self.blocks4:
-        #     x = blk(x)
-        # x = self.up_linear(x)
-        # x = self.norm(x)
         return x
 
     def forward(self, x):
         x = self.forward_features(x)
-        # x = rearrange(x, 'b (h w) c -> b c h w',h=4,w=16)
-        # if self.last_stage:
-        #     x = self.linear(x)
-            # B = x.shape[0]
-            # if self.patch_merging is not None:
-            #     h = self.HW[0] // 4
-            # else:
-            #     h = self.HW[0]
-            # x = self.avg_pool(x.transpose(1, 2).reshape(B, self.embed_dim[2], h, self.HW[1]))
-            # x = self.last_conv(x)
-            # x = self.hardswish(x)
-            # x = self.dropout(x)
-        # x = self.head(x)
         return x

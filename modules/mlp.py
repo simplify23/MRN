@@ -9,22 +9,7 @@ from torch import Tensor
 from torch.nn import init
 from torch.nn.modules.utils import _pair
 from torchvision.ops.deform_conv import deform_conv2d as deform_conv2d_tv
-
-# def _cfg(url='', **kwargs):
-#     return {
-#         'url': url,
-#         'num_classes': 1000, 'input_size': (3, 224, 224), 'pool_size': None,
-#         'crop_pct': .96, 'interpolation': 'bicubic',
-#         'mean': IMAGENET_DEFAULT_MEAN, 'std': IMAGENET_DEFAULT_STD, 'classifier': 'head',
-#         **kwargs
-#     }
-#
-# default_cfgs = {
-#     'cycle_S': _cfg(crop_pct=0.9),
-#     'cycle_M': _cfg(crop_pct=0.9),
-#     'cycle_L': _cfg(crop_pct=0.875),
-# }
-from modules.block import SpatialGatingUnit, GatingMlpBlock
+from modules.block import GatingMlpBlock
 
 
 class Mlp(nn.Module):
@@ -277,13 +262,9 @@ class WeightedPermuteMLPv3(nn.Module):
             w = rearrange(x,'b i t c -> b c (i t)')
             w = self.mlp_w(w)
             w = rearrange(w,'b c (i t) -> b i t c',t = self.patch)
-            # w = x.permute(0, 3, 1, 2)
-            # w = self.mlp_w(w).permute(0, 2, 3, 1)
         else:
             w = self.mlp_w(x)
 
-
-        # c = self.mlp_c(x)
         # B, C, H, W -> B, C,[ H, W ]
         a = (h + w).permute(0, 3, 1, 2).flatten(2).mean(2)
         a = self.reweight(a).reshape(B, C, 2).permute(2, 0, 1).softmax(dim=0).unsqueeze(2).unsqueeze(2)
@@ -347,7 +328,7 @@ class WeightedPermuteMLPv2(nn.Module):
 
 class PermutatorBlock(nn.Module):
 
-    def __init__(self, dim, mlp_ratio=4., taski = 1, patch = 63, segment_dim=8, qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
+    def __init__(self, dim, mlp_ratio=4., taski = 1, patch = 63, segment_dim=8, qkv_bias=False,
                  drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, skip_lam=1.0, mlp_fn=WeightedPermuteMLPv3):
         super().__init__()
         self.norm1 = norm_layer(dim)
