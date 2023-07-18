@@ -56,15 +56,6 @@ def load_dict(path,char,tmp_char):
     print("dict has {} number characters\n".format(len(character)))
     return character,char
 
-def count_char_score(tmp_char):
-    beta = 0.9999
-    gamma = 2.0
-    weights = []
-    for key, value in tmp_char.items():
-        effective_num = 1.0 - np.power(beta, value)
-        weights.append((1.0 - beta) / np.array(effective_num))
-    weights = weights / np.sum(weights) * len(tmp_char)
-    return weights
 
 def build_arg(parser):
     parser.add_argument(
@@ -341,7 +332,6 @@ def train(opt, log):
                 opt.character = load_dict(train_data,char)
             else:
                 opt.character,tmp_char = load_dict(data_path+f"/{opt.lan_list[taski]}",char,tmp_char)
-        # char_score = count_char_score(tmp_char)
         # ----- incremental model start -------
 
         learner.incremental_train(taski, opt.character, train_loader, valid_loader)
