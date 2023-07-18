@@ -42,8 +42,8 @@ class Ensem(BaseLearner):
 
     def __init__(self, opt):
         super().__init__(opt)
-        self.model = Ensemble_exp(opt)
-        # self.model = Ensemble(opt)
+        # self.model = Ensemble_exp(opt)
+        self.model = Ensemble(opt)
 
     def after_task(self):
         # will we need this line ? (AB Study)
@@ -59,7 +59,7 @@ class Ensem(BaseLearner):
             for i in range(taski):
                 self.model.module.model[i].eval()
 
-    def build_custom_optimizer(self,filtered_parameters,optimizer="adam", schedule="super",scale=1.0):
+    def build_custom_optimizer(self,filtered_parameters,optimizer="adam", schedule="super",scale=1.0,the=2):
         if optimizer == "sgd":
             optimizer = torch.optim.SGD(
                 filtered_parameters,
@@ -90,7 +90,7 @@ class Ensem(BaseLearner):
                 cycle_momentum=cycle_momentum,
                 div_factor=20,
                 final_div_factor=1000,
-                total_steps=self.opt.num_iter,
+                total_steps=self.opt.num_iter * the,
             )
             # print("Scheduler:")
             # print(scheduler)
@@ -213,7 +213,7 @@ class Ensem(BaseLearner):
 
             if taski > 0 and step == 0:
                 train_loader.get_dataset(taski, memory=None)
-                self.freeze_step1(taski)
+                # self.freeze_step1(taski)
                 # self.update_step1(0, taski, train_loader, valid_loader.create_dataset())
             elif taski > 0 and step ==1:
                 if self.opt.memory != None:
@@ -299,12 +299,12 @@ class Ensem(BaseLearner):
                 train_loss_avg.reset()
 
     def update_step1(self,start_iter,taski, train_loader, valid_loader):
-        self.model_eval_and_train(taski)
+        # self.model_eval_and_train(taski)
         self._init_train(start_iter, taski, train_loader, valid_loader,cross=False)
         self.model.train()
-        for p in self.model.module.model[-1].parameters():
-            p.requires_grad = False
-        self.model.module.model[-1].eval()
+        # for p in self.model.module.model[-1].parameters():
+        #     p.requires_grad = False
+        # self.model.module.model[-1].eval()
 
     def freeze_step1(self,  taski):
         self.model_eval_and_train(taski)
@@ -329,7 +329,7 @@ class Ensem(BaseLearner):
         filtered_parameters = self.count_param(self.model)
 
         # setup optimizer
-        self.build_custom_optimizer(filtered_parameters,optimizer="adam",schedule="super",scale=1)
+        self.build_custom_optimizer(filtered_parameters,optimizer="adam",schedule="super",scale=1,the=2)
 
         # for name, param in self.model.named_parameters():
         #     if param.requires_grad:
@@ -408,6 +408,7 @@ class Ensem(BaseLearner):
     def val(self, valid_loader, opt, best_score, start_time, iteration,
             train_loss_avg, train_taski_loss_avg, taski, step,val_choose="val"):
         self.model.eval()
+        start_time = time.time()
         with torch.no_grad():
             (
                 valid_loss,
@@ -444,7 +445,7 @@ class Ensem(BaseLearner):
         # valid_log += f", Semi_loss: {semi_loss_avg.val():0.5f}\n"
         valid_log += f'{"":9s}Current_score: {current_score:0.2f}, Ned_score: {ned_score:0.2f}\n'
         valid_log += f'{"":9s}Current_lr: {lr:0.7f}, Best_score: {best_score:0.2f}\n'
-        valid_log += f'{"":9s}Infer_time: {infer_time:0.2f},     Elapsed_time: {elapsed_time:0.2f}\n'
+        valid_log += f'{"":9s}Infer_time: {infer_time:0.2f},     Elapsed_time: {elapsed_time/length_of_data * 1000 :0.2f}\n'
 
         # show some predicted results
         dashed_line = "-" * 80
@@ -487,7 +488,7 @@ class Ensem(BaseLearner):
 
         task_accs = []
         ned_accs = []
-        for val_data in valid_datas:
+        for i,val_data in enumerate(valid_datas):
             valid_dataset, valid_dataset_log = hierarchical_dataset(
                 root=val_data, opt=self.opt, mode="test")
             valid_loader = torch.utils.data.DataLoader(
@@ -510,7 +511,7 @@ class Ensem(BaseLearner):
                     labels,
                     infer_time,
                     length_of_data,
-                ) = validation(self.model, self.criterion, valid_loader, self.converter, self.opt,val_choose=val_choose)
+                ) = validation(self.model, self.criterion, valid_loader, self.converter, self.opt,val_choose=val_choose,name=self.opt.lan_list[i//2],path=f"./saved_models/{self.opt.exp_name}/")
 
 
             task_accs.append(round(current_score,2))

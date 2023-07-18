@@ -1,8 +1,7 @@
 common=dict(
-    exp_name="CRNN_joint_test",  # Where to store logs and models
-    il="joint_loader",  # joint_mix ｜ joint_loader | base | lwf | wa | ewc ｜ der  | ems
-    memory="random",  # None | random | bag | cof_max | score
-    # None | random | test (just for ems) |large | total | bag | score | cof_max | rehearsal |
+    exp_name="CRNN_ems_mix_la",  # Where to store logs and models
+    il="ems",  # joint_mix ｜ joint_loader | base | lwf | wa | ewc ｜ der  | ems
+    memory="random", # None | rehearsal | random | bag | score | loss_max | test
     memory_num=2000,
     batch_max_length = 25,
     imgH = 32,
@@ -14,11 +13,11 @@ common=dict(
 
 """ Model Architecture """
 model=dict(
-    model_name="SVTR",
-    Transformation = "None",    #None TPS
-    FeatureExtraction = "VGG",  #VGG ResNet
-    SequenceModeling = None,
-    Prediction = "CTC",  #CTC Attn
+    model_name="CRNN",
+    Transformation = "None",
+    FeatureExtraction = "VGG",
+    SequenceModeling = 'BiLSTM',
+    Prediction = "CTC",
     num_fiducial=20,
     input_channel=4,
     output_channel=512,
@@ -48,18 +47,29 @@ train = dict(
     workers=4,
     ch_list = None,
     # ch_list = ["ArT","RCTW","ReCTS","LSVT","CTW"],
-    # lan_list=["Chinese","Latin","Japanese", "Korean", "Arabic", "Bangla"],
-    lan_list=["Chinese", "Arabic","Bangla","Korean", "Latin", "Japanese"],
-    valid_datas=["../dataset/MLT2019/test_2019"],
-    select_data=["../dataset/MLT2017/train_2017","../dataset/MLT2019/train_2019"],
-    train_data="../dataset/MLT2017/train_2017",  # stash
-    valid_data="../dataset/MLT2019/test_2019",  # stash
+    lan_list=["Ch", "La", "Ko", ],
+    # lan_list=["Latin", "Arabic", "Bangla", "Chinese", "Japanese", "Korean",],
+    # lan_list=["Arabic", "Chinese", "Latin","Japanese", "Bangla","Korean",],
+    train_data = "../../../test/ztl/IL/MLT17_IL/train_2017",
+    valid_data="../../../test/ztl/IL/MLT19_IL/test_2019",
+    valid_datas=["../../../test/ztl/IL/Mix_IL/MLT17_IL/test_2017",
+                 "../../../test/ztl/IL/Mix_IL/MLT19_IL/test_2019",
+                 "../../../test/ztl/IL/Mix_IL/MLT17/test_2017",
+                 "../../../test/ztl/IL/Mix_IL/MLT19/test_2019"
+                 ],
+    # train_data="../dataset/chinese",
+    # valid_data="../dataset/chinese",
     # select_data="/",
-    batch_ratio="0.5-0.5",
+    select_data=["../../../test/ztl/IL/Mix_IL/MLT17_IL/train_2017",
+                 "../../../test/ztl/IL/Mix_IL/MLT19_IL/train_2019",
+                 "../../../test/ztl/IL/Mix_IL/MLT17/train_2017",
+                 "../../../test/ztl/IL/Mix_IL/MLT19/train_2019"
+                 ],
+    batch_ratio="0.5-0.5-0.5-0.5",
     total_data_usage_ratio="1.0",
     NED=True,
-    batch_size=12,
-    num_iter=2000,
+    batch_size=256,
+    num_iter=10000,
     val_interval=5000,
     log_multiple_test=None,
     FT="init",

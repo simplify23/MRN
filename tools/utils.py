@@ -23,7 +23,7 @@ class CTCLabelConverter(object):
         self.dict = {}
         for i, char in enumerate(dict_character):
             # NOTE: 0 is reserved for 'CTCblank' token required by CTCLoss, not same with space ' '.
-            # print(i, char)
+            # print(type(char))
             self.dict[char] = i + 1
 
         self.character = [
@@ -229,3 +229,51 @@ def crop_img(src_img, box, long_edge_pad_ratio=0.4, short_edge_pad_ratio=0.2):
     dst_img = src_img[top:bottom, left:right]
 
     return dst_img
+
+def read_txt(path):
+    f = open(path)
+    list = []
+    char_dict = {}
+    line = f.readline()
+    while line:
+        list.append(line.strip("\n"))
+        # print(line)
+        line = f.readline()
+    f.close()
+    for str in list:
+        for char in str:
+            if char_dict.get(char, None) == None:
+                char_dict[char] = 1
+            else:
+                char_dict[char] += 1
+    return char_dict
+def dict_total(path='.txt',
+               path_a='_all.txt'):
+    root = '/share/home/ztl/CIL_MLSTR/exp/base/'
+    language = "Japanese"
+    path_ = language+'test.txt'
+    char_list = []
+    true_char = read_txt(root + language + path)
+    total_char = read_txt(root + language + path_a)
+    for key, value in total_char.items():
+        acc = true_char.get(key, 0) / total_char[key]
+        char_list.append([key,value,acc])
+        print([key,value,acc])
+    pred_list = sorted(char_list,key=lambda list: list[1])
+    start_i = 0
+    for i,list in enumerate(pred_list):
+        if i != 0 and list[1] != pred_list[i-1][1]:
+            avg = acc / (i- start_i)
+            # avg = acc / (i + 1)
+            str_log = "avg {} char is {:.2f} total {}\n".format(pred_list[i-1][1],avg,i - start_i)
+            print(str_log)
+            with open(root + path_, "a") as log:
+                    log.write(str_log)
+            start_i = i
+            acc = 0
+        acc += list[2]
+    with open(root + path_, "a") as log:
+        for line in pred_list:
+            log.write(str(line) + "\n")
+# dict_total()
+

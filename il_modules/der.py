@@ -300,6 +300,7 @@ class DER(BaseLearner):
     def val(self, valid_loader, opt, best_score, start_time, iteration,
             train_loss_avg,train_clf_loss, train_aux_loss, taski):
         self.model.eval()
+        start_time = time.time()
         with torch.no_grad():
             (
                 valid_loss,
@@ -335,7 +336,7 @@ class DER(BaseLearner):
             valid_log += f"CLF_loss: {train_clf_loss.val():0.5f} , Aux_loss: {train_aux_loss.val():0.5f}\n"
         valid_log += f'{"":9s}Current_score: {current_score:0.2f},   Ned_score: {ned_score:0.2f}\n'
         valid_log += f'{"":9s}Current_lr: {lr:0.7f}, Best_score: {best_score:0.2f}\n'
-        valid_log += f'{"":9s}Infer_time: {infer_time:0.2f},     Elapsed_time: {elapsed_time:0.2f}\n'
+        valid_log += f'{"":9s}Infer_time: {infer_time:0.2f},     Elapsed_time: {elapsed_time/length_of_data:0.4f}\n'
 
         # show some predicted results
         dashed_line = "-" * 80

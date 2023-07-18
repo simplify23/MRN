@@ -10,7 +10,9 @@ import torch.utils.data
 import numpy as np
 from mmcv import Config
 from tqdm import tqdm
-
+from ptflops import get_model_complexity_info
+from thop import profile
+from collections import OrderedDict
 from tools.utils import CTCLabelConverter, AttnLabelConverter, Averager, adjust_learning_rate
 from data.dataset import hierarchical_dataset, AlignCollate, Batch_Balanced_Dataset
 from modules.model import Model
@@ -543,7 +545,7 @@ class BaseLearner(object):
 
         task_accs = []
         ned_accs = []
-        for val_data in valid_datas:
+        for i,val_data in enumerate(valid_datas):
             valid_dataset, valid_dataset_log = hierarchical_dataset(
                 root=val_data, opt=self.opt, mode="test")
             valid_loader = torch.utils.data.DataLoader(
@@ -566,7 +568,7 @@ class BaseLearner(object):
                     labels,
                     infer_time,
                     length_of_data,
-                ) = validation(self.model, self.criterion, valid_loader, self.converter, self.opt,val_choose="test")
+                ) = validation(self.model, self.criterion, valid_loader, self.converter, self.opt,val_choose="test",name=self.opt.lan_list[i//2],path=f"./saved_models/{self.opt.exp_name}/")
 
 
             task_accs.append(round(current_score,2))
@@ -604,29 +606,57 @@ class BaseLearner(object):
         return score17,score19
 
 
-    # def count_param(self):
-    #     filtered_parameters = []
-    #     params_num = []
-    #     for p in filter(lambda p: p.requires_grad, self.model.parameters()):
-    #         filtered_parameters.append(p)
-    #         params_num.append(np.prod(p.size()))
-    #     print("Trainable params num: {:.2f} M".format(sum(params_num) / 1000000))
-    #     self.write_log("Trainable params num: {:.2f} M\n".format(sum(params_num) / 1000000))
-    #     return filtered_parameters
-
     def count_param(self,model,trainable=True):
         filtered_parameters = []
         params_num = []
-        if trainable == False:
-            params = sum(p.numel() for p in model.parameters())
-            print("All params num: {:.2f} M".format(params / 1000000))
-            self.write_log("All params num: {:.2f} M\n".format(params/ 1000000))
-        for p in filter(lambda p: p.requires_grad, model.parameters()):
+        for p in filter(lambda p: p.requires_grad, self.model.parameters()):
             filtered_parameters.append(p)
             params_num.append(np.prod(p.size()))
         print("Trainable params num: {:.2f} M".format(sum(params_num) / 1000000))
         self.write_log("Trainable params num: {:.2f} M\n".format(sum(params_num) / 1000000))
         return filtered_parameters
+
+    # def count_param(self,model,trainable=True):
+    #     filtered_parameters = []
+    #     params_num = []
+    #     device = torch.device("cuda:0" )
+    #
+    #     model = model.to(device)
+    #     # if str(next(model.parameters()).device) != "cuda:0":
+    #     #     model.to("cuda:0")
+    #     # for name, buffer in model.named_buffers():
+    #     #     if not buffer.device == torch.device("cuda:0"):
+    #     #         print(f"Moving buffer {name} from {buffer.device} to cuda:0")
+    #     #         buffer.to("cuda:0")
+    #     #
+    #     # for i, buffer in enumerate(model.buffers()):
+    #     #     if not buffer.device == torch.device("cuda:0"):
+    #     #         print(f"Buffer {i} device: {buffer.device}")
+    #
+    #     # import pdb
+    #     # pdb.set_trace()
+    #
+    #     # macs, params = profile(model, inputs=(torch.randn(1,4,64,256).to("cpu"),))
+    #     macs, params = get_model_complexity_info(model, (4, 64, 256), as_strings=True,
+    #                                          print_per_layer_stat=True, verbose=True)
+    #
+    #
+    #     model.train()
+    #     # print("FLOPS num: {:.3f}G ".format(macs.total()/1000**3))
+    #     # self.write_log("FLOPS num: {:.3f}G \n".format(macs.total()/1000**3))
+    #     print("FLOPS num: {} ".format(macs))
+    #     self.write_log("FLOPS : {} \n".format(macs))
+    #
+    #     if trainable == False:
+    #         params = sum(p.numel() for p in model.parameters())
+    #         print("All params num: {:.2f} M".format(params / 1000000))
+    #         self.write_log("All params num: {:.2f} M\n".format(params/ 1000000))
+    #     for p in filter(lambda p: p.requires_grad, model.parameters()):
+    #         filtered_parameters.append(p)
+    #         params_num.append(np.prod(p.size()))
+    #     print("Trainable params num: {:.2f} M".format(sum(params_num) / 1000000))
+    #     self.write_log("Trainable params num: {:.2f} M\n".format(sum(params_num) / 1000000))
+    #     return filtered_parameters
 
     def print_config(self,opt):
         self_log = "------------ selfions -------------\n"

@@ -59,7 +59,7 @@ def load_dict(path,char,tmp_char):
     for key, value in char.items():
         character.append(key)
     print("dict has {} number characters\n".format(len(character)))
-    return character,tmp_char
+    return character,char
 
 def count_char_score(tmp_char):
     beta = 0.9999
@@ -294,7 +294,6 @@ def train(opt, log):
         learner = BaseLearner(opt)
 
     data_manager = Dataset_Manager(opt)
-    
     for taski in range(len(train_datasets)):
         train_data = os.path.join(opt.train_data, train_datasets[taski])
         for valid_data in opt.valid_datas:
@@ -319,18 +318,33 @@ def train(opt, log):
         # )
         if opt.il =="joint_loader" or opt.il == "joint_mix":
             valid_datas = []
+            character = []
+            char = {}
             for taski in range(len(train_datasets)):
+                # char={}
                 # train_data = os.path.join(opt.train_data, train_datasets[taski])
                 for val_data in opt.valid_datas:
                     valid_data = os.path.join(val_data, valid_datasets[taski])
                     valid_datas.append(valid_data)
                 data_manager.joint_start(opt, train_data, select_data, log, taski, len(train_datasets))
             # -------load char to dict --------#
+            #     len_data = len(dataset)
+            #     for index in range(len_data):
+            #         (image_tensor, label) = dataset[index]
+            #         for ch in label:
+            #             if char.get(ch, None) == None:
+            #                 char[ch] = 1
+            #             else:
+            #                 char[ch] += 1
                 for data_path in opt.select_data:
-                    opt.character, tmp_char = load_dict(data_path + f"/{opt.lan_list[taski]}", char, tmp_char)
+                    opt.character, char = load_dict(data_path + f"/{opt.lan_list[taski]}", char, tmp_char)
+            # for key, value in char.items():
+            #     character.append({key: value})
+            # print(opt.character)
+            print(len(opt.character))
             best_scores,ned_scores = learner.incremental_train(0,opt.character, data_manager, valid_loader,AlignCollate_valid,valid_datas)
             """ Evaluation at the end of training """
-            # best_scores, ned_scores = learner.test(AlignCollate_valid, valid_datas, best_scores, ned_scores, 0)
+            best_scores, ned_scores = learner.test(AlignCollate_valid, valid_datas, best_scores, ned_scores, 0)
             break
         if taski == 0:
             data_manager.init_start(opt, train_data, select_data, log, taski, memory=None)

@@ -517,7 +517,7 @@ class Ensemble(nn.Module):
             self.patch = 64
         elif self.opt.FeatureExtraction == "ResNet":
             self.patch = 65
-        self.mlp = "autoencoder"  #gmlp | vip | gmlpv2 | autoencoder
+        self.mlp = "gmlpv2"  #gmlp | vip | gmlpv2 | autoencoder
         self.layer_num = 1
         self.beta = 1
 
@@ -884,7 +884,7 @@ class Ensemble_exp(Ensemble):
             self.patch = 64
         elif self.opt.FeatureExtraction == "ResNet":
             self.patch = 65
-        self.mlp = "autoencoder"  #gmlp | vip | gmlpv2 | autoencoder
+        self.mlp = "LPN"  #gmlp | vip | gmlpv2 | autoencoder | LPN
         self.layer_num = 1
         self.beta = 1
 

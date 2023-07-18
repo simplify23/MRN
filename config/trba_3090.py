@@ -1,5 +1,5 @@
 common=dict(
-    exp_name="TRBA_ems_random_baseline",  # Where to store logs and models
+    exp_name="TRBA_hard_autoencoder_random_baseline",  # Where to store logs and models
     il="ems",  # joint_mix ｜ joint_loader | base | lwf | wa | ewc ｜ der  | ems
     memory="random", # None | rehearsal | random | bag | score | loss_max | test
     memory_num=2000,
