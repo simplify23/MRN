@@ -306,16 +306,6 @@ def train(opt, log):
         select_data = opt.select_data
         AlignCollate_valid = AlignCollate(opt, mode="test")
 
-        # # set batch_ratio for each data.
-        # if opt.batch_ratio:
-        #     batch_ratio = opt.batch_ratio.split("-")
-        #     # batch_ratio = opt.batch_ratio
-        # else:
-        #     batch_ratio = [round(1 / len(select_data), 3)] * len(select_data)
-        #
-        # train_loader = Batch_Balanced_Dataset(
-        #     opt, train_data, select_data, batch_ratio, log,taski
-        # )
         if opt.il =="joint_loader" or opt.il == "joint_mix":
             valid_datas = []
             character = []
