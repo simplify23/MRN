@@ -100,12 +100,6 @@ train.py (as a default, evaluate trained model on 6 benchmark datasets at the en
 * `--saved_model`: assign saved model to use pretrained model such as RotNet and MoCo.
 * `--self_pre`: whether to use self-supversied pretrained model |RotNet|MoCo|. default: RotNet
 
-pretrain.py
-* `--train_data`: folder path to training lmdb dataset. default: `data_CVPR2021/training/unlabel/`
-* `--valid_data`: folder path to validation lmdb dataset. default: `data_CVPR2021/validation/`
-* `--select_data`: select training data. default is 'unlabel' which means 3 real unlabeled datasets.
-* `--model_name`: select model 'NV' for CRNN. 'NR' or 'TR' for TRBA.
-* `--self`: whether to use self-supervised learning |RotNet|MoCo|
 
 test.py
 * `--eval_data`: folder path to evaluation lmdb dataset. As a default, when you use `eval_type`, this will be set to `data_CVPR2021/evaluation/benchmark/` or `data_CVPR2021/evaluation/addition/`
@@ -141,11 +135,11 @@ This implementation has been based on the repository [deep-text-recognition-benc
 ## Citation
 Please consider citing this work in your publications if it helps your research.
 ```
-@inproceedings{baek2021STRfewerlabels,
-  title={What If We Only Use Real Datasets for Scene Text Recognition? Toward Scene Text Recognition With Fewer Labels},
-  author={Baek, Jeonghun and Matsui, Yusuke and Aizawa, Kiyoharu},
-  booktitle={IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
-  year={2021}
+@article{zheng2023mrn,
+  title={MRN: Multiplexed Routing Network for Incremental Multilingual Text Recognition},
+  author={Zheng, Tianlun and Chen, Zhineng and Huang, BingChen and Zhang, Wei and Jiang, Yu-Gang},
+  journal={ICCV 2023},
+  year={2023}
 }
 ```
 

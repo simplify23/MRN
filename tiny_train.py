@@ -3,7 +3,6 @@ import sys
 import time
 import random
 import argparse
-import il_modules
 from data.data_manage import Dataset_Manager, Val_Dataset
 from il_modules.base import BaseLearner
 from il_modules.der import DER
@@ -21,14 +20,10 @@ import torch.nn.init as init
 import torch.utils.data
 import numpy as np
 from mmcv import Config
-from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
 
-from tools.utils import CTCLabelConverter, AttnLabelConverter, Averager, adjust_learning_rate
-from data.dataset import hierarchical_dataset, AlignCollate, Batch_Balanced_Dataset
+from data.dataset import hierarchical_dataset, AlignCollate
 from modules.model import Model
-from test import validation, benchmark_all_eval
-from modules.semi_supervised import PseudoLabelLoss, MeanTeacherLoss
+from test import validation
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -569,12 +564,6 @@ if __name__ == "__main__":
     else:
         opt.CUDA_VISIBLE_DEVICES = 0  # for convenience
     opt.num_gpu = torch.cuda.device_count()
-    # if opt.num_gpu > 1:
-    #     print(
-    #         "We recommend to use 1 GPU, check your GPU number, you would miss CUDA_VISIBLE_DEVICES=0 or typo"
-    #     )
-    #     print("To use multi-gpu setting, remove or comment out these lines")
-    #     sys.exit()
 
     if sys.platform == "win32":
         opt.workers = 0
