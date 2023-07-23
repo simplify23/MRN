@@ -2,7 +2,13 @@
 
 # MRN: Multiplexed Routing Network <br/> for Incremental Multilingual Text Recognition
 
-[Paper](https://arxiv.org/abs/2305.14758) | [Method](#methods) |[IMLTR Dataset](#imltr-dataset) | [Getting Started](#getting-started) | [Citation](#citation)
+
+![ICCV 2023](https://img.shields.io/badge/ICCV-2023-ff7c00)
+[![ArXiv preprint](http://img.shields.io/badge/ArXiv-2305-b31b1b)](https://arxiv.org/abs/2305.14758)
+[![Blog](http://img.shields.io/badge/Blog-Link-6790ac)](https://zhuanlan.zhihu.com/p/643948935)
+![LICENSE](https://img.shields.io/badge/license-MIT-green?style=flat-square)
+
+[Method](#methods) |[IMLTR Dataset](#imltr-dataset) | [Getting Started](#getting-started) | [Citation](#citation)
 
 </div>
 
@@ -19,8 +25,7 @@ This project is a toolkit for the novel scenario of Incremental Multilingual Tex
 
 </div>
 
-- A introduction (in Chinese) is available [here](https://zhuanlan.zhihu.com/p/643948935).
-
+---
 ## Methods
 ### Incremental Learning Methods 
 * [x] Base: Baseline method which simply updates parameters on new tasks.
