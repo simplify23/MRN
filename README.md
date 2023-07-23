@@ -1,13 +1,8 @@
 <div align="center">
 
 # MRN: Multiplexed Routing Network <br/> for Incremental Multilingual Text Recognition
-[![Apache License 2.0](https://img.shields.io/github/license/baudm/parseq)](https://github.com/baudm/parseq/blob/main/LICENSE)
-[![arXiv preprint](http://img.shields.io/badge/arXiv-2207.06966-b31b1b)](https://arxiv.org/abs/2305.14758)
-[![In Proc. ICCV 2023](http://img.shields.io/badge/ECCV-2022-6790ac)](https://www.ecva.net/papers/eccv_2022/papers_ECCV/html/556_ECCV_2022_paper.php)
-[![Gradio demo](https://img.shields.io/badge/%F0%9F%A4%97%20demo-Gradio-ff7c00)](https://huggingface.co/spaces/baudm/PARSeq-OCR)
 
-
-[Method](#method-tldr) | [Sample Results](#sample-results) | [Getting Started](#getting-started) | [FAQ](#frequently-asked-questions) | [Training](#training) | [Evaluation](#evaluation) | [Citation](#citation)
+[Method](#Methods-Reproduced) |[Paper](https://arxiv.org/abs/2305.14758) |[Getting Started](#getting-started) | [IMLTR Dataset](#IMLTRDataset) | [Training](#training) | [Citation](#citation)
 
 </div>
 
@@ -17,14 +12,21 @@ Scene Text Recognition (STR) models use language context to be more robust again
 Official PyTorch implementation of MRN (Accepted by ICCV 2023)
 MRN: Multiplexed Routing Network for Incremental Multilingual Text Recognition
 
+![image](https://github.com/simplify23/MRN/assets/39580716/b865e4c3-e1a4-4fb7-a0d2-91ebc959af46)
 
-## To Do List
-* [x] base
-* [x] lwf
-* [x] ewc
-* [x] wa
-* [x] der
-* [x] mrn
+
+
+### Methods Reproduced
+
+* [x] Base: Baseline method which simply updates parameters on new tasks.
+* [x] Joint: Upound method which simply updates parameters on new tasks.
+* [x] [EWC](https://arxiv.org/abs/1612.00796) `[PNAS2017]`: Overcoming catastrophic forgetting in neural networks. 
+* [x] [LwF](https://arxiv.org/abs/1911.07053) `[ECCV2016]`:  Learning without Forgetting.
+* [x] [WA](https://arxiv.org/abs/1911.07053) `[CVPR2020]`: Maintaining Discrimination and Fairness in Class Incremental Learning. 
+* [x] [DER](https://arxiv.org/abs/2103.16788) `[CVPR2021]`: DER: Dynamically Expandable Representation for Class Incremental Learning. 
+* [x] [MRN](https://arxiv.org/abs/2305.14758) `[ICCV2023]`: MRN: Multiplexed Routing Network for Incremental Multilingual Text Recognition. 
+
+### IMLTR Dataset
 
 
 ## Getting Started
@@ -41,7 +43,7 @@ pip install torch==1.9.1+cu111 torchvision==0.10.1+cu111 torchaudio==0.9.1 -f ht
 pip3 install lmdb pillow torchvision nltk natsort fire tensorboard tqdm opencv-python einops timm mmcv shapely scipy
 pip install mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.1/index.html
 ```
-### Download lmdb dataset for traininig and evaluation 
+### IMLTR Dataset
 See [`data.md`](https://github.com/ku21fan/STR-Fewer-Labels/blob/main/data.md)
 ```
 python3 tiny_train.py --config=config/crnn_3090.py --exp_name CRNN_real
