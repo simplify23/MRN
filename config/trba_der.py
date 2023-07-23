@@ -1,5 +1,5 @@
 common=dict(
-    exp_name="CRNN_der_test",  # Where to store logs and models
+    exp_name="TRBA_DER",  # Where to store logs and models
     il="der",  # joint_mix ｜ joint_loader | base | lwf | wa | ewc ｜ der  | mrn
     memory="random",  # None | random
     memory_num=2000,
@@ -13,11 +13,11 @@ common=dict(
 
 """ Model Architecture """
 model=dict(
-    model_name="CRNN",
-    Transformation = "None",      #None TPS
-    FeatureExtraction = "VGG",    #VGG ResNet
+    model_name="TRBA",
+    Transformation = "TPS",      #None TPS
+    FeatureExtraction = "ResNet",    #VGG ResNet
     SequenceModeling = "BiLSTM",  #None BiLSTM
-    Prediction = "CTC",           #CTC Attn
+    Prediction = "Attn",           #CTC Attn
     num_fiducial=20,
     input_channel=4,
     output_channel=512,

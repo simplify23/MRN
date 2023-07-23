@@ -1,5 +1,5 @@
 common=dict(
-    exp_name="CRNN_mrn_test2",  # Where to store logs and models
+    exp_name="CRNN_MRN",  # Where to store logs and models
     il="mrn",  # joint_mix ｜ joint_loader | base | lwf | wa | ewc ｜ der  | mrn
     memory="random",  # None | random
     memory_num=2000,

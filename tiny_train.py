@@ -56,25 +56,31 @@ def load_dict(path,char):
 def build_arg(parser):
     parser.add_argument(
         "--config",
-        default="config/crnn.py",
+        default="config/crnn_mrn.py",
         help="path to validation dataset",
     )
     parser.add_argument(
-        "--valid_data",
-        default="../dataset/MLT2017/val_gt/mlt_2017_val",
-        help="path to validation dataset",
+        "--valid_datas",
+        default=[" ../dataset/MLT17_IL/test_2017", "../dataset/MLT19_IL/test_2019"],
+        help="path to testing dataset",
+    )
+    parser.add_argument(
+        "--select_data",
+        type=str,
+        default=[" ../dataset/MLT17_IL/train_2017", "../dataset/MLT19_IL/train_2019"],
+        help="select training data.",
     )
     parser.add_argument(
         "--workers", type=int, default=4, help="number of data loading workers"
     )
     parser.add_argument("--batch_size", type=int, default=128, help="input batch size")
     parser.add_argument(
-        "--num_iter", type=int, default=200000, help="number of iterations to train for"
+        "--num_iter", type=int, default=20000, help="number of iterations to train for"
     )
     parser.add_argument(
         "--val_interval",
         type=int,
-        default=2000,
+        default=5000,
         help="Interval between each validation",
     )
     parser.add_argument(
@@ -120,6 +126,7 @@ def build_arg(parser):
         default=0.1,
         help="lr_drop_rate. default is the same setting with ASTER",
     )
+
     """ Model Architecture """
     parser.add_argument("--model_name", type=str, required=False, help="CRNN|TRBA")
     parser.add_argument(
@@ -143,14 +150,8 @@ def build_arg(parser):
     parser.add_argument(
         "--hidden_size", type=int, default=256, help="the size of the LSTM hidden state"
     )
+
     """ Data processing """
-    parser.add_argument(
-        "--select_data",
-        type=str,
-        # default="label",
-        default="../dataset/MLT2017/val_gt/mlt_2017_val",
-        help="select training data.",
-    )
     parser.add_argument(
         "--batch_ratio",
         type=str,
