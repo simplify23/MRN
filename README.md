@@ -30,7 +30,8 @@ This project is a toolkit for the novel scenario of Incremental Multilingual Tex
 * [x] [DER](https://arxiv.org/abs/2103.16788) `[CVPR2021]`: DER: Dynamically Expandable Representation for Class Incremental Learning. 
 * [x] [MRN](https://arxiv.org/abs/2305.14758) `[ICCV2023]`: MRN: Multiplexed Routing Network for Incremental Multilingual Text Recognition. 
 
-### IMLTR Dataset
+## IMLTR Dataset
+The Dataset can be downloaded from BaiduNetdisk(passwd:1dbv).
 
 ```
 dataset
@@ -58,32 +59,12 @@ pip3 install lmdb pillow torchvision nltk natsort fire tensorboard tqdm opencv-p
 pip3 install mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.1/index.html
 ```
 
-### Training
+## Training
 ```
-python3 tiny_train.py --config=config/crnn_3090.py --exp_name CRNN_real
+python3 tiny_train.py --config=config/crnn_mrn.py --exp_name CRNN_real
 ```
-<h3 id="pretrained_models"> Run demo with pretrained model <a href="https://colab.research.google.com/github/ku21fan/STR-Fewer-Labels/blob/master/demo_in_colab.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a> </h3> 
-
-1. [Download pretrained model](https://www.dropbox.com/sh/23adceu2i85c4x1/AACLmaiL43Jy8eYIVVUkZ344a?dl=0) <br>
-There are 2 models (CRNN or TRBA) and 5 different settings of each model.
-
-    Setting | Description
-    -- | --
-    Baseline-synth | Model trained on 2 synthetic datasets (MJSynth + SynthText)
-    Baseline-real | Model trained on 11 real datasets (Real-L in Table 1 of our paper)
-    Aug | Best augmentation setting in our experiments
-    PL | Combination of Aug and Pseudo-Label (PL)
-    PR | Combination of Aug, PL and RotNet
-
-2. Add image files to test into `demo_image/`
-3. Run demo.py
-   ```
-   CUDA_VISIBLE_DEVICES=0 python3 demo.py --model_name TRBA --image_folder demo_image/ \
-   --saved_model TRBA-Baseline-real.pth
-   ```
-
 ### Arguments
-train.py (as a default, evaluate trained model on 6 benchmark datasets at the end of training.)
+tiny_train.py (as a default, evaluate trained model on 6 benchmark datasets at the end of training.)
 * `--train_data`: folder path to training lmdb dataset. default: `data_CVPR2021/training/label/`
 * `--valid_data`: folder path to validation lmdb dataset. default: `data_CVPR2021/validation/`
 * `--select_data`: select training data. default is 'label' which means 11 real labeled datasets.
