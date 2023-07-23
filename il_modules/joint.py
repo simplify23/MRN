@@ -1,21 +1,10 @@
-import os
 import time
-from collections import defaultdict
-from queue import Queue,PriorityQueue
-
 import torch
-import torch.backends.cudnn as cudnn
-import torch.nn.init as init
 import torch.utils.data
-import numpy as np
-from mmcv import Config
 from tqdm import tqdm
 
 from il_modules.base import BaseLearner
-from tools.utils import CTCLabelConverter, AttnLabelConverter, Averager, adjust_learning_rate
-from data.dataset import hierarchical_dataset, AlignCollate, Batch_Balanced_Dataset
-from modules.model import Model
-from test import validation, benchmark_all_eval
+from tools.utils import Averager, adjust_learning_rate
 
 class JointLearner(BaseLearner):
 
@@ -34,7 +23,7 @@ class JointLearner(BaseLearner):
             self.build_model()
 
         # filter that only require gradient descent
-        filtered_parameters = self.count_param(self.model)
+        filtered_parameters = self.count_param()
 
         # setup optimizer
         self.build_optimizer(filtered_parameters)
@@ -56,7 +45,6 @@ class JointLearner(BaseLearner):
     def _init_train(self,start_iter,taski, train_loader, valid_loader,AlignCollate_valid,valid_datas):
         # loss averager
         train_loss_avg = Averager()
-        semi_loss_avg = Averager()
         best_scores = []
         ned_scores = []
 
@@ -115,5 +103,4 @@ class JointLearner(BaseLearner):
                     best_scores,ned_scores = self.test(AlignCollate_valid,valid_datas,best_scores,ned_scores,taski)
                     self.model.train()
                 train_loss_avg.reset()
-                semi_loss_avg.reset()
         return best_scores,ned_scores

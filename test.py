@@ -426,12 +426,12 @@ if __name__ == "__main__":
         default="None",
         help="whether to use augmentation |None|Blur|Crop|Rot|",
     )
-    parser.add_argument(
-        "--semi",
-        type=str,
-        default="None",
-        help="whether to use semi-supervised learning |None|PL|MT|",
-    )
+    # parser.add_argument(
+    #     "--semi",
+    #     type=str,
+    #     default="None",
+    #     help="whether to use semi-supervised learning |None|PL|MT|",
+    # )
     """ Model Architecture """
     parser.add_argument("--model_name", type=str, help="CRNN|TRBA")
     parser.add_argument(

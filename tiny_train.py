@@ -6,7 +6,7 @@ import argparse
 from data.data_manage import Dataset_Manager, Val_Dataset
 from il_modules.base import BaseLearner
 from il_modules.der import DER
-from il_modules.ensemble import Ensem
+from il_modules.mrn import MRN
 from il_modules.ewc import EWC
 from il_modules.joint import JointLearner
 from il_modules.lwf import LwF
@@ -15,18 +15,16 @@ from il_modules.wa import WA
 print(os.getcwd()) #打印出当前工作路径
 import torch
 import torch.backends.cudnn as cudnn
-import torch.nn.init as init
 import torch.utils.data
 import numpy as np
 from mmcv import Config
 
 from data.dataset import hierarchical_dataset, AlignCollate
-from modules.model import Model
 from test import validation
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def write_data_log(line,name=None):
+def write_data_log(line):
     '''
 
     :param name:
@@ -36,7 +34,7 @@ def write_data_log(line,name=None):
     with open(f"data_any.txt", "a+") as log:
         log.write(line)
 
-def load_dict(path,char,tmp_char):
+def load_dict(path,char):
     ch_list = []
     character = []
     f = open(path + "/dict.txt")
@@ -62,12 +60,12 @@ def build_arg(parser):
         default="config/crnn.py",
         help="path to validation dataset",
     )
-    parser.add_argument(
-        "--train_data",
-        # default="data_CVPR2021/training/label/",
-        default="../dataset/MLT2017/val_gt/mlt_2017_val",
-        help="path to training dataset",
-    )
+    # parser.add_argument(
+    #     "--train_data",
+    #     # default="data_CVPR2021/training/label/",
+    #     default="../dataset/MLT2017/val_gt/mlt_2017_val",
+    #     help="path to training dataset",
+    # )
     parser.add_argument(
         "--valid_data",
         default="../dataset/MLT2017/val_gt/mlt_2017_val",
@@ -89,9 +87,9 @@ def build_arg(parser):
     parser.add_argument(
         "--log_multiple_test", action="store_true", help="log_multiple_test"
     )
-    parser.add_argument(
-        "--FT", type=str, default="init", help="whether to do fine-tuning |init|freeze|"
-    )
+    # parser.add_argument(
+    #     "--FT", type=str, default="init", help="whether to do fine-tuning |init|freeze|"
+    # )
     parser.add_argument(
         "--grad_clip", type=float, default=5, help="gradient clipping value. default=5"
     )
@@ -199,28 +197,28 @@ def build_arg(parser):
         default="None",
         help="whether to use augmentation |None|Blur|Crop|Rot|",
     )
-    """ Semi-supervised learning """
-    parser.add_argument(
-        "--semi",
-        type=str,
-        default="None",
-        help="whether to use semi-supervised learning |None|PL|MT|",
-    )
-    parser.add_argument(
-        "--MT_C", type=float, default=1, help="Mean Teacher consistency weight"
-    )
-    parser.add_argument(
-        "--MT_alpha", type=float, default=0.999, help="Mean Teacher EMA decay"
-    )
-    parser.add_argument(
-        "--model_for_PseudoLabel", default="", help="trained model for PseudoLabel"
-    )
-    parser.add_argument(
-        "--self_pre",
-        type=str,
-        default="RotNet",
-        help="whether to use `RotNet` or `MoCo` pretrained model.",
-    )
+    # """ Semi-supervised learning """
+    # parser.add_argument(
+    #     "--semi",
+    #     type=str,
+    #     default="None",
+    #     help="whether to use semi-supervised learning |None|PL|MT|",
+    # )
+    # parser.add_argument(
+    #     "--MT_C", type=float, default=1, help="Mean Teacher consistency weight"
+    # )
+    # parser.add_argument(
+    #     # "--MT_alpha", type=float, default=0.999, help="Mean Teacher EMA decay"
+    # )
+    # parser.add_argument(
+    #     # "--model_for_PseudoLabel", default="", help="trained model for PseudoLabel"
+    # )
+    # parser.add_argument(
+    #     "--self_pre",
+    #     type=str,
+    #     default="RotNet",
+    #     help="whether to use `RotNet` or `MoCo` pretrained model.",
+    # )
     """ exp_name and etc """
     parser.add_argument("--exp_name", help="Where to store logs and models")
     parser.add_argument(
@@ -240,12 +238,12 @@ def train(opt, log):
     write_data_log(f"----------- {opt.exp_name} ------------\n")
     print(f"----------- {opt.exp_name} ------------\n")
 
-    if opt.ch_list!=None:
-        train_datasets = [ch+"/train" for ch in opt.ch_list]
-        valid_datasets = [ch+"/test" for ch in opt.ch_list]
-    else:
-        train_datasets = [lan for lan in opt.lan_list]
-        valid_datasets = [lan for lan in opt.lan_list]
+    # if opt.ch_list!=None:
+    #     train_datasets = [ch+"/train" for ch in opt.ch_list]
+    #     valid_datasets = [ch+"/test" for ch in opt.ch_list]
+    # else:
+    # train_datasets = [lan for lan in opt.lan_list]
+    valid_datasets = train_datasets = [lan for lan in opt.lan_list]
 
     best_scores = []
     ned_scores = []
@@ -269,8 +267,8 @@ def train(opt, log):
         learner = EWC(opt)
     elif opt.il == "der":
         learner = DER(opt)
-    elif opt.il == "ems":
-        learner = Ensem(opt)
+    elif opt.il == "mrn":
+        learner = MRN(opt)
     elif opt.il == "joint_mix" or opt.il == "joint_loader":
         learner = JointLearner(opt)
     else:
@@ -278,20 +276,18 @@ def train(opt, log):
 
     data_manager = Dataset_Manager(opt)
     for taski in range(len(train_datasets)):
-        train_data = os.path.join(opt.train_data, train_datasets[taski])
+        # train_data = os.path.join(opt.train_data, train_datasets[taski])
         for valid_data in opt.valid_datas:
             val_data = os.path.join(valid_data, valid_datasets[taski])
             valid_datas.append(val_data)
 
         valid_loader = Val_Dataset(valid_datas,opt)
-        tmp_char = dict()
         """dataset preparation"""
         select_data = opt.select_data
         AlignCollate_valid = AlignCollate(opt, mode="test")
 
         if opt.il =="joint_loader" or opt.il == "joint_mix":
             valid_datas = []
-            character = []
             char = {}
             for taski in range(len(train_datasets)):
                 # char={}
@@ -299,36 +295,24 @@ def train(opt, log):
                 for val_data in opt.valid_datas:
                     valid_data = os.path.join(val_data, valid_datasets[taski])
                     valid_datas.append(valid_data)
-                data_manager.joint_start(opt, train_data, select_data, log, taski, len(train_datasets))
-            # -------load char to dict --------#
-            #     len_data = len(dataset)
-            #     for index in range(len_data):
-            #         (image_tensor, label) = dataset[index]
-            #         for ch in label:
-            #             if char.get(ch, None) == None:
-            #                 char[ch] = 1
-            #             else:
-            #                 char[ch] += 1
+                data_manager.joint_start(opt, select_data, log, taski, len(train_datasets))
                 for data_path in opt.select_data:
-                    opt.character, char = load_dict(data_path + f"/{opt.lan_list[taski]}", char, tmp_char)
-            # for key, value in char.items():
-            #     character.append({key: value})
-            # print(opt.character)
+                    opt.character, char = load_dict(data_path + f"/{opt.lan_list[taski]}", char)
             print(len(opt.character))
             best_scores,ned_scores = learner.incremental_train(0,opt.character, data_manager, valid_loader,AlignCollate_valid,valid_datas)
             """ Evaluation at the end of training """
             best_scores, ned_scores = learner.test(AlignCollate_valid, valid_datas, best_scores, ned_scores, 0)
             break
         if taski == 0:
-            data_manager.init_start(opt, train_data, select_data, log, taski, memory=None)
+            data_manager.init_start(opt, select_data, log, taski)
         train_loader = data_manager
 
         #-------load char to dict --------#
         for data_path in opt.select_data:
             if data_path=="/":
-                opt.character = load_dict(train_data,char)
+                opt.character = load_dict(data_path+f"/{opt.lan_list[taski]}",char)
             else:
-                opt.character,tmp_char = load_dict(data_path+f"/{opt.lan_list[taski]}",char,tmp_char)
+                opt.character,tmp_char = load_dict(data_path+f"/{opt.lan_list[taski]}",char)
         # ----- incremental model start -------
 
         learner.incremental_train(taski, opt.character, train_loader, valid_loader)
@@ -376,10 +360,10 @@ def val(model, criterion, valid_loader, converter, opt,optimizer,best_score,star
         # (training should be done without referring test set).
         if current_score > best_score:
             best_score = current_score
-            if opt.ch_list!=None:
-                name = opt.ch_list[taski]
-            else:
-                name = opt.lan_list[taski]
+            # if opt.ch_list!=None:
+            #     name = opt.ch_list[taski]
+            # else:
+            name = opt.lan_list[taski]
             torch.save(
                 model.state_dict(),
                 f"./saved_models/{opt.exp_name}/{name}_{taski}_best_score.pth",
@@ -419,10 +403,10 @@ def test(AlignCollate_valid,valid_datas,model,criterion,converter,opt,best_score
     """ keep evaluation model and result logs """
     os.makedirs(f"./result/{opt.exp_name}", exist_ok=True)
     os.makedirs(f"./evaluation_log", exist_ok=True)
-    if opt.ch_list != None:
-        name = opt.ch_list[taski]
-    else:
-        name = opt.lan_list[taski]
+    # if opt.ch_list != None:
+    #     name = opt.ch_list[taski]
+    # else:
+    name = opt.lan_list[taski]
     saved_best_model = f"./saved_models/{opt.exp_name}/{name}_{taski}_best_score.pth"
     # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
     model.load_state_dict(torch.load(f"{saved_best_model}"))
@@ -465,39 +449,39 @@ def test(AlignCollate_valid,valid_datas,model,criterion,converter,opt,best_score
     log.write(acc_log)
     return best_scores,log
 
-def change_model(opt, model):
-    """ model configuration """
-    # model.module.reset_class(opt, device)
-    reset_class(model.module, opt, device)
-    # data parallel for multi-GPU
-    model.train()
-    return model
+# def change_model(opt, model):
+#     """ model configuration """
+#     # model.module.reset_class(opt, device)
+#     reset_class(model.module, opt, device)
+#     # data parallel for multi-GPU
+#     model.train()
+#     return model
 
 
-def build_model(opt, log):
-    """ model configuration """
-
-    model = Model(opt)
-
-    # weight initialization
-    for name, param in model.named_parameters():
-        if "localization_fc2" in name:
-            print(f"Skip {name} as it is already initialized")
-            continue
-        try:
-            if "bias" in name:
-                init.constant_(param, 0.0)
-            elif "weight" in name:
-                init.kaiming_normal_(param)
-        except Exception as e:  # for batchnorm.
-            if "weight" in name:
-                param.data.fill_(1)
-            continue
-
-    # data parallel for multi-GPU
-    model = torch.nn.DataParallel(model).to(device)
-    model.train()
-    return model,log
+# def build_model(opt, log):
+#     """ model configuration """
+#
+#     model = Model(opt)
+#
+#     # weight initialization
+#     for name, param in model.named_parameters():
+#         if "localization_fc2" in name:
+#             print(f"Skip {name} as it is already initialized")
+#             continue
+#         try:
+#             if "bias" in name:
+#                 init.constant_(param, 0.0)
+#             elif "weight" in name:
+#                 init.kaiming_normal_(param)
+#         except Exception as e:  # for batchnorm.
+#             if "weight" in name:
+#                 param.data.fill_(1)
+#             continue
+#
+#     # data parallel for multi-GPU
+#     model = torch.nn.DataParallel(model).to(device)
+#     model.train()
+#     return model,log
 
 
 if __name__ == "__main__":
@@ -510,30 +494,12 @@ if __name__ == "__main__":
 
     opt={}
     opt.update(cfg.common)
-    opt.update(cfg.test)
+    # opt.update(cfg.test)
     opt.update(cfg.model)
     opt.update(cfg.train)
     opt.update(cfg.optimizer)
 
     opt = argparse.Namespace(**opt)
-
-    # if opt.model_name == "CRNN":  # CRNN = NVBC
-    #     opt.Transformation = "None"
-    #     opt.FeatureExtraction = "VGG"
-    #     opt.SequenceModeling = "BiLSTM"
-    #     opt.Prediction = "CTC"
-    #
-    # elif opt.model_name == "TRBA":  # TRBA
-    #     opt.Transformation = "TPS"
-    #     opt.FeatureExtraction = "ResNet"
-    #     opt.SequenceModeling = "BiLSTM"
-    #     opt.Prediction = "Attn"
-    #
-    # elif opt.model_name == "RBA":  # RBA
-    #     opt.Transformation = "None"
-    #     opt.FeatureExtraction = "ResNet"
-    #     opt.SequenceModeling = "BiLSTM"
-    #     opt.Prediction = "Attn"
 
     """ Seed and GPU setting """
     random.seed(opt.manual_seed)

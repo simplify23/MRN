@@ -7,8 +7,6 @@ import re
 
 import mmcv
 import numpy as np
-import scipy.io as scio
-import yaml
 from shapely.geometry import Polygon
 
 def crop_img(src_img, box, long_edge_pad_ratio=0.4, short_edge_pad_ratio=0.2):
@@ -50,6 +48,58 @@ def crop_img(src_img, box, long_edge_pad_ratio=0.4, short_edge_pad_ratio=0.2):
     dst_img = src_img[top:bottom, left:right]
 
     return dst_img
+
+def test_crop_img(src_img, box, long_edge_pad_ratio=0.4, short_edge_pad_ratio=0.2):
+    pts1 = np.float32([[wordBB[0][0], wordBB[1][0]],
+                       [wordBB[0][3], wordBB[1][3]],
+                       [wordBB[0][1], wordBB[1][1]],
+                       [wordBB[0][2], wordBB[1][2]]])
+    height = math.sqrt((wordBB[0][0] - wordBB[0][3]) ** 2 + (wordBB[1][0] - wordBB[1][3]) ** 2)
+    width = math.sqrt((wordBB[0][0] - wordBB[0][1]) ** 2 + (wordBB[1][0] - wordBB[1][1]) ** 2)
+
+    # Coord validation check
+    if (height * width) <= 0:
+        err_log = 'empty file : {}\t{}\t{}\n'.format(image_name, txt[word_indx], wordBB)
+        err_file.write(err_log)
+        # print(err_log)
+        continue
+    elif (height * width) > (img_height * img_width):
+        err_log = 'too big box : {}\t{}\t{}\n'.format(image_name, txt[word_indx], wordBB)
+        err_file.write(err_log)
+        # print(err_log)
+        continue
+    else:
+        valid = True
+        for i in range(2):
+            for j in range(4):
+                if wordBB[i][j] < 0 or wordBB[i][j] > img.shape[1 - i]:
+                    valid = False
+                    break
+            if not valid:
+                break
+        if not valid:
+            err_log = 'invalid coord : {}\t{}\t{}\t{}\t{}\n'.format(
+                image_name, txt[word_indx], wordBB, (width, height), (img_width, img_height))
+            err_file.write(err_log)
+            # print(err_log)
+            continue
+
+    pts2 = np.float32([[0, 0],
+                       [0, height],
+                       [width, 0],
+                       [width, height]])
+
+    x_min = np.int(round(min(wordBB[0][0], wordBB[0][1], wordBB[0][2], wordBB[0][3])))
+    x_max = np.int(round(max(wordBB[0][0], wordBB[0][1], wordBB[0][2], wordBB[0][3])))
+    y_min = np.int(round(min(wordBB[1][0], wordBB[1][1], wordBB[1][2], wordBB[1][3])))
+    y_max = np.int(round(max(wordBB[1][0], wordBB[1][1], wordBB[1][2], wordBB[1][3])))
+    # print(x_min, x_max, y_min, y_max)
+    # print(img.shape)
+    # assert 1<0
+    if len(img.shape) == 3:
+        img_cropped = img[y_min:y_max:1, x_min:x_max:1, :]
+    else:
+        img_cropped = img[y_min:y_max:1, x_min:x_max:1]
 
 def list_to_file(filename, lines):
     """Write a list of strings to a text file.
@@ -242,43 +292,46 @@ def generate_ann(root_path, image_infos, out_dir):
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Convert SynthMLT annotations to COCO format')
-    parser.add_argument('root_path', help='SynthMLT root path')
-    parser.add_argument('lan', default="Hindi", help='languang for data')
-    parser.add_argument('out_dir', default="test",help='output path')
+    parser.add_argument('--root_path', help='SynthMLT root path')
+    parser.add_argument('--lan', default="Hindi", help='languang for data')
+    parser.add_argument('--out_dir', default="test",help='output path')
     # parser.add_argument(
     #     '--split-list',
     #     nargs='+',
     #     help='a list of splits. e.g., "--split_list training test"')
 
     parser.add_argument(
-        '--nproc', default=1, type=int, help='number of process')
+        '--nproc', default=10, type=int, help='number of process')
     args = parser.parse_args()
     return args
 
-def unzip(lan):
-    root_path = "../dataset/SynthMLT/"
+def unzip(root_path, lan):
+    # root_path = "../dataset/SynthMLT/"
     img_path = "{}{}".format(root_path, lan)
     gt_path = "{}{}_gt".format(root_path, lan)
 
-    if os.path.exists(img_path):
-        os.system(f"rm -r {img_path}")
-    cmd = "unzip -d {} {}.zip".format(img_path, img_path)
-    # os.popen(cmd)
-    os.system(cmd)
+    if not os.path.exists(img_path):
+        # os.system(f"rm -r {img_path}")
+        cmd = "unzip -d {} {}.zip".format(img_path, img_path)
+        os.system(cmd)
 
-    if os.path.exists(gt_path):
-        os.system(f"rm -r {gt_path}")
-    cmd = "unzip -d {} {}.zip".format(gt_path, gt_path)
-    os.system(cmd)
+
+    if not os.path.exists(gt_path):
+        # os.system(f"rm -r {gt_path}")
+        cmd = "unzip -d {} {}.zip".format(gt_path, gt_path)
+        os.system(cmd)
 
 def main():
     args = parse_args()
-    unzip(args.lan)
+    unzip(args.root_path, args.lan)
     # root_path = args.root_path + args.lan
-    out_dir = args.root_path + args.out_dir if args.out_dir else args.root_path
+    # out_dir = args.root_path + args.out_dir if args.out_dir else args.root_path
+    out_dir = args.out_dir
     root_path = args.root_path + args.lan
     mmcv.mkdir_or_exist(out_dir)
     out_dir = osp.join(out_dir, args.lan)
+    print("save to {}\n".format(out_dir))
+
 
 
     # root_path = "../dataset/SynthMLT/"
@@ -293,6 +346,7 @@ def main():
         # print("--------------------start------------\n{}".format(files))
         image_infos = collect_annotations(files, nproc=args.nproc)
         generate_ann(root_path, image_infos,out_dir)
+    print(out_dir)
 
 
 if __name__ == '__main__':

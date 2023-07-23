@@ -1,14 +1,8 @@
 import bisect
-import os
-
-import numpy as np
 import numpy.random
 import torch
 from torch.utils.data import Dataset, ConcatDataset, Subset
-from torch._utils import _accumulate
-import torchvision.transforms as transforms
-
-from data.dataset import concat_dataset, AlignCollate, LmdbDataset, AlignCollate2, hierarchical_dataset
+from data.dataset import AlignCollate, LmdbDataset, AlignCollate2, hierarchical_dataset
 
 
 class Dataset_Manager(object):
@@ -19,15 +13,14 @@ class Dataset_Manager(object):
         self.select_data = None
         self.opt = opt
 
-
-    def get_dataset(self, taski, memory="random_memory",index_list=None):
+    def get_dataset(self, taski, memory="random",index_list=None):
         self.data_loader_list = []
         self.dataloader_iter_list = []
         memory_num = self.opt.memory_num
 
         dataset = self.create_dataset(data_list=self.select_data,taski=taski)
 
-        if memory != None and self.opt.il=="ems":
+        if memory != None and self.opt.il=="mrn":
             # curr: num/(taski-1) mem: num/(taski-1)
             index_current = numpy.random.choice(range(len(dataset)),int(self.opt.memory_num/(taski)),replace=False)
             split_dataset = Subset(dataset,index_current.tolist())
@@ -63,28 +56,17 @@ class Dataset_Manager(object):
             memory_data,index_list = self.rehearsal_memory(taski, random=False,total_num=memory_num,index_array=index_list)
             self.create_dataloader(memory_data,(self.opt.batch_size)//2)
             self.create_dataloader(dataset,(self.opt.batch_size)//2)
-        # elif memory == "rehearsal":
-        #     memory_data, index_list = self.rehearsal_memory(taski, random=False,total_num=2000,index_array=index_list)
-        #     self.create_dataloader(memory_data,(self.opt.batch_size)//2)
-        #     self.create_dataloader(dataset,(self.opt.batch_size)//2)
         else:
             self.create_dataloader(dataset)
         return index_list
 
     def joint_start(
-        self, opt, dataset_root, select_data, log, taski,total_task):
+        self, opt, select_data, log, taski,total_task):
         self.opt = opt
         self.select_data = select_data
         dashed_line = "-" * 80
         print(dashed_line)
         log.write(dashed_line + "\n")
-        # print(
-        #     f"dataset_root: {dataset_root}\n select_data: {select_data}\n"
-        # )
-        # log.write(
-        #     f"dataset_root: {dataset_root}\n select_data: {select_data}\n"
-        # )
-
 
         dataset = self.create_dataset(data_list=self.select_data, taski=taski)
         if opt.il == "joint_mix":
@@ -96,7 +78,7 @@ class Dataset_Manager(object):
 
 
     def init_start(
-        self, opt, dataset_root, select_data, log, taski,memory="random"):
+        self, opt, select_data, log, taski):
         self.opt = opt
         self.select_data = select_data
         self.data_loader_list = []
@@ -105,32 +87,12 @@ class Dataset_Manager(object):
         print(dashed_line)
         log.write(dashed_line + "\n")
         print(
-            f"dataset_root: {dataset_root}\n select_data: {select_data}\n"
+            f"select_data: {select_data}\n"
         )
         log.write(
-            f"dataset_root: {dataset_root}\n select_data: {select_data}\n"
+            f"select_data: {select_data}\n"
         )
         self.get_dataset(taski, memory=None)
-        # dataset = self.create_dataset(data_list=select_data,taski=taski)
-        # self.create_dataloader(dataset)
-        # if memory == "random_memory":
-        #     memory_data = self.memory_dataset(select_data, taski, random=True,total_num=2000)
-        #     self.create_dataloader(memory_data)
-
-        # self.data_list.append(dataset)
-        # self.create_data_loader(dataset)
-
-    def memory_dataset(self,select_data, taski, random=True,total_num=2000,index_list=None):
-        data_list = []
-        num_i = int(total_num/taski)
-        for i in range(taski):
-            dataset = self.create_dataset(data_list=select_data,taski=i,repeat=False)
-            if random:
-                index_list = numpy.random.choice(range(len(dataset)),num_i,replace=False)
-            # print(random)
-            split_dataset = Subset(dataset,list(index_list))
-            data_list.append(split_dataset)
-        return ConcatDataset(data_list)
 
     def rehearsal_memory(self,taski, random=False,total_num=2000,index_array=None,repeat=False):
         data_list = []
@@ -162,16 +124,10 @@ class Dataset_Manager(object):
         )
         return data_loader,len(dataset)
 
-    def rehearsal_prev_dataset(self,taski,):
-        select_data = self.select_data
-        dataset = self.create_dataset(data_list=select_data,taski=taski-1,repeat=False)
-        return dataset,len(dataset)
-
     def create_dataset(self, data_list="/", taski=0, mode="train", repeat=True):
         """select_data is list for all dataset"""
         dataset_list = []
         for data_root in data_list:
-            # dataset_log = f"dataset_root: {data_root}"
             # print(dataset_log)
             # dataset_log += "\n"
             dataset = LmdbDataset(data_root + "/" + self.opt.lan_list[taski], self.opt, mode=mode)
@@ -276,7 +232,7 @@ class Val_Dataset(object):
         valid_dataset, valid_dataset_log = hierarchical_dataset(
             root=val_data, opt=self.opt, mode="test"
         )
-        print(valid_dataset_log)
+        # print(valid_dataset_log)
         print("-" * 80)
         valid_loader = torch.utils.data.DataLoader(
             valid_dataset,
@@ -331,8 +287,6 @@ class DummyDataset(Dataset):
         assert len(images) == len(labels), 'Data size error!'
         self.images = images
         self.labels = labels
-        # self.trsf = trsf
-        # self.use_path = use_path
 
     def __len__(self):
         return len(self.images)

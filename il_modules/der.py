@@ -1,13 +1,6 @@
-import logging
 import time
-
-import numpy as np
 from tqdm import tqdm
 import torch
-from torch import nn
-from torch import optim
-from torch.nn import functional as F
-from torch.utils.data import DataLoader
 import torch.nn.init as init
 from il_modules.base import BaseLearner
 from modules.model import DERNet
@@ -111,7 +104,7 @@ class DER(BaseLearner):
                     p.requires_grad = False
 
         # filter that only require gradient descent
-        filtered_parameters = self.count_param(self.model,False)
+        filtered_parameters = self.count_param()
 
         # setup optimizer
         self.build_optimizer(filtered_parameters)
@@ -124,10 +117,10 @@ class DER(BaseLearner):
                 else:
                     train_loader.get_dataset(taski, memory=self.opt.memory)
 
-            if self.opt.ch_list!=None:
-                name = self.opt.ch_list[taski]
-            else:
-                name = self.opt.lan_list[taski]
+            # if self.opt.ch_list!=None:
+            #     name = self.opt.ch_list[taski]
+            # else:
+            name = self.opt.lan_list[taski]
             saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_best_score.pth"
             # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
             self.model.load_state_dict(torch.load(f"{saved_best_model}"), strict=True)
@@ -208,7 +201,6 @@ class DER(BaseLearner):
             # To see training progress, we also conduct validation when 'iteration == 1'
             if iteration % self.opt.val_interval == 0 or iteration ==1:
                 # for validation log
-                # print("66666666")
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
                     train_loss_avg, train_clf_loss, train_aux_loss, taski)
                 train_loss_avg.reset()
@@ -269,8 +261,8 @@ class DER(BaseLearner):
                 loss_aux = self.criterion(
                     aux_logits.view(-1, aux_logits.shape[-1]), aux_targets.contiguous().view(-1)
                 )
-            loss = loss_clf + loss_aux
-            # loss = loss_clf
+            # loss = loss_clf + loss_aux
+            loss = loss_clf
 
             self.model.zero_grad()
             loss.backward()
@@ -319,10 +311,10 @@ class DER(BaseLearner):
         # (training should be done without referring test set).
         if current_score > best_score:
             best_score = current_score
-            if opt.ch_list != None:
-                name = opt.ch_list[taski]
-            else:
-                name = opt.lan_list[taski]
+            # if opt.ch_list != None:
+            #     name = opt.ch_list[taski]
+            # else:
+            name = opt.lan_list[taski]
             torch.save(
                 self.model.state_dict(),
                 f"./saved_models/{opt.exp_name}/{name}_{taski}_best_score.pth",

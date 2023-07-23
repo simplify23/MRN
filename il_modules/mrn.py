@@ -1,22 +1,16 @@
-import logging
-import os
 import time
 import os
-
-import numpy as np
 from tqdm import tqdm
 import torch
 from torch import nn
-from torch import optim
 from torch.nn import functional as F
+from torch.autograd import Variable
 from torch.utils.data import DataLoader
 import torch.nn.init as init
-from torch.autograd import Variable
 
 from data.dataset import hierarchical_dataset
 from il_modules.base import BaseLearner
-from il_modules.der import DER
-from modules.model import DERNet, Ensemble, Ensemble_exp
+from modules.model import MRNNet
 from test import validation
 from tools.utils import Averager, adjust_learning_rate
 
@@ -38,12 +32,11 @@ num_workers = 8
 T = 2
 
 
-class Ensem(BaseLearner):
+class MRN(BaseLearner):
 
     def __init__(self, opt):
         super().__init__(opt)
-        # self.model = Ensemble_exp(opt)
-        self.model = Ensemble(opt)
+        self.model = MRNNet(opt)
 
     def after_task(self):
         # will we need this line ? (AB Study)
@@ -168,7 +161,7 @@ class Ensem(BaseLearner):
                     p.requires_grad = False
 
         # filter that only require gradient descent
-        filtered_parameters = self.count_param(self.model,False)
+        filtered_parameters = self.count_param()
 
         # setup optimizer
         self.build_optimizer(filtered_parameters)
@@ -186,14 +179,14 @@ class Ensem(BaseLearner):
         else:
             num_i = int(memory_num / (taski))
         # self.build_queue_bag_memory(num_i, taski, train_loader)
-        if self.opt.memory == "rehearsal" or self.opt.memory == "loss_max" or self.opt.memory == "cof_max":
-            self.build_current_memory(num_i, taski, train_loader)
-        elif self.opt.memory == "bag":
-            self.build_queue_bag_memory(num_i, taski, train_loader)
-        elif self.opt.memory == "score":
-            self.dataset_label_score(num_i, taski, train_loader)
-        else:
-            self.build_random_current_memory(num_i, taski, train_loader)
+        # if self.opt.memory == "rehearsal" or self.opt.memory == "loss_max" or self.opt.memory == "cof_max":
+        #     self.build_current_memory(num_i, taski, train_loader)
+        # # elif self.opt.memory == "bag":
+        # #     self.build_queue_bag_memory(num_i, taski, train_loader)
+        # elif self.opt.memory == "score":
+        #     self.dataset_label_score(num_i, taski, train_loader)
+        # else:
+        self.build_random_current_memory(num_i, taski, train_loader)
         if memory_num < 5000:
             if len(self.memory_index) != 0 and len(self.memory_index)*len(self.memory_index[0]) > memory_num:
                 self.reduce_samplers(taski,taski_num =num_i)
@@ -293,7 +286,6 @@ class Ensem(BaseLearner):
             # To see training progress, we also conduct validation when 'iteration == 1'
             if iteration % self.opt.val_interval == 0 or iteration ==self.opt.num_iter:
                 # for validation log
-                # print("66666666")
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
                     train_loss_avg, None, taski,0,"FF")
                 train_loss_avg.reset()
@@ -301,10 +293,10 @@ class Ensem(BaseLearner):
     def update_step1(self,start_iter,taski, train_loader, valid_loader):
         # self.model_eval_and_train(taski)
         self._init_train(start_iter, taski, train_loader, valid_loader,cross=False)
-        self.model.train()
-        # for p in self.model.module.model[-1].parameters():
-        #     p.requires_grad = False
-        # self.model.module.model[-1].eval()
+        # self.model.train()
+        for p in self.model.module.model[-1].parameters():
+            p.requires_grad = False
+        self.model.module.model[-1].eval()
 
     def freeze_step1(self,  taski):
         self.model_eval_and_train(taski)
@@ -326,7 +318,7 @@ class Ensem(BaseLearner):
         # self._init_train(start_iter, taski, train_loader, valid_loader)
         # filtered_parameters = self.count_param(self.model, False)
         self.criterion = self.build_criterion()
-        filtered_parameters = self.count_param(self.model)
+        filtered_parameters = self.count_param()
 
         # setup optimizer
         self.build_custom_optimizer(filtered_parameters,optimizer="adam",schedule="super",scale=1,the=2)
@@ -427,10 +419,10 @@ class Ensem(BaseLearner):
         # (training should be done without referring test set).
         if current_score > best_score:
             best_score = current_score
-            if opt.ch_list != None:
-                name = opt.ch_list[taski]
-            else:
-                name = opt.lan_list[taski]
+            # if opt.ch_list != None:
+            #     name = opt.ch_list[taski]
+            # else:
+            name = opt.lan_list[taski]
             torch.save(
                 self.model.state_dict(),
                 f"./saved_models/{opt.exp_name}/{name}_{taski}_{step}_best_score.pth",
@@ -478,10 +470,10 @@ class Ensem(BaseLearner):
         """ keep evaluation model and result logs """
         os.makedirs(f"./result/{self.opt.exp_name}", exist_ok=True)
         os.makedirs(f"./evaluation_log", exist_ok=True)
-        if self.opt.ch_list != None:
-            name = self.opt.ch_list[taski]
-        else:
-            name = self.opt.lan_list[taski]
+        # if self.opt.ch_list != None:
+        #     name = self.opt.ch_list[taski]
+        # else:
+        name = self.opt.lan_list[taski]
         saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_{step}_best_score.pth"
         # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
         self.model.load_state_dict(torch.load(f"{saved_best_model}"),strict=True)
@@ -511,7 +503,7 @@ class Ensem(BaseLearner):
                     labels,
                     infer_time,
                     length_of_data,
-                ) = validation(self.model, self.criterion, valid_loader, self.converter, self.opt,val_choose=val_choose,name=self.opt.lan_list[i//2],path=f"./saved_models/{self.opt.exp_name}/")
+                ) = validation(self.model, self.criterion, valid_loader, self.converter, self.opt,val_choose=val_choose)
 
 
             task_accs.append(round(current_score,2))
@@ -537,35 +529,35 @@ class Ensem(BaseLearner):
         return best_scores,ned_scores
 
 
-class FocalLoss(nn.Module):
-    def __init__(self, gamma=0, alpha=None, size_average=True):
-        super(FocalLoss, self).__init__()
-        self.gamma = gamma
-        self.alpha = alpha
-        if isinstance(alpha,(float,int)): self.alpha = torch.Tensor([alpha,1-alpha])
-        if isinstance(alpha,list): self.alpha = torch.Tensor(alpha)
-        self.size_average = size_average
-
-    def forward(self, input, target):
-        if input.dim()>2:
-            input = input.view(input.size(0),input.size(1),-1)  # N,C,H,W => N,C,H*W
-            input = input.transpose(1,2)    # N,C,H*W => N,H*W,C
-            input = input.contiguous().view(-1,input.size(2))   # N,H*W,C => N*H*W,C
-        target = target.view(-1,1)
-
-        logpt = F.log_softmax(input)
-        logpt = logpt.gather(1,target)
-        logpt = logpt.view(-1)
-        pt = Variable(logpt.data.exp())
-
-        if self.alpha is not None:
-            if self.alpha.type()!=input.data.type():
-                self.alpha = self.alpha.type_as(input.data)
-            at = self.alpha.gather(0,target.data.view(-1))
-            logpt = logpt * Variable(at)
-
-        loss = -1 * (1-pt)**self.gamma * logpt
-        if self.size_average: return loss.mean()
-        else: return loss.sum()
+# class FocalLoss(nn.Module):
+#     def __init__(self, gamma=0, alpha=None, size_average=True):
+#         super(FocalLoss, self).__init__()
+#         self.gamma = gamma
+#         self.alpha = alpha
+#         if isinstance(alpha,(float,int)): self.alpha = torch.Tensor([alpha,1-alpha])
+#         if isinstance(alpha,list): self.alpha = torch.Tensor(alpha)
+#         self.size_average = size_average
+#
+#     def forward(self, input, target):
+#         if input.dim()>2:
+#             input = input.view(input.size(0),input.size(1),-1)  # N,C,H,W => N,C,H*W
+#             input = input.transpose(1,2)    # N,C,H*W => N,H*W,C
+#             input = input.contiguous().view(-1,input.size(2))   # N,H*W,C => N*H*W,C
+#         target = target.view(-1,1)
+#
+#         logpt = F.log_softmax(input)
+#         logpt = logpt.gather(1,target)
+#         logpt = logpt.view(-1)
+#         pt = Variable(logpt.data.exp())
+#
+#         if self.alpha is not None:
+#             if self.alpha.type()!=input.data.type():
+#                 self.alpha = self.alpha.type_as(input.data)
+#             at = self.alpha.gather(0,target.data.view(-1))
+#             logpt = logpt * Variable(at)
+#
+#         loss = -1 * (1-pt)**self.gamma * logpt
+#         if self.size_average: return loss.mean()
+#         else: return loss.sum()
 
 

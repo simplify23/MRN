@@ -1,13 +1,6 @@
-import logging
 import time
-
-import numpy as np
 import torch
-from torch import nn
-from torch.serialization import load
 from tqdm import tqdm
-from torch import optim
-from torch.nn import functional as F
 
 from il_modules.base import BaseLearner
 from tools.utils import Averager, adjust_learning_rate
@@ -66,7 +59,6 @@ class EWC(BaseLearner):
     def _update_representation(self,start_iter, taski, train_loader, valid_loader):
         # loss averager
         train_loss_avg = Averager()
-        # semi_loss_avg = Averager()
 
         start_time = time.time()
         best_score = -1

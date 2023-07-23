@@ -1,13 +1,6 @@
-import logging
 import time
-
-import numpy as np
 import torch
-from torch import nn
-from torch.serialization import load
 from tqdm import tqdm
-from torch import optim
-from torch.nn import functional as F
 
 from il_modules.base import BaseLearner
 from tools.utils import Averager, adjust_learning_rate

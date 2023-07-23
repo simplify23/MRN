@@ -3,7 +3,6 @@ import torch
 from torch import nn
 from timm.models.layers import trunc_normal_
 from functools import partial
-from einops import rearrange
 
 def drop_path(x, drop_prob: float = 0., training: bool = False, scale_by_keep: bool = True):
     """Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
@@ -74,9 +73,7 @@ class ConvMixer(nn.Module):
                  dim,
                  num_heads=8,
                  HW=[8, 25],
-                 local_k=[3, 3],
-                 attn_drop=0.,
-                 proj_drop=0.):
+                 local_k=[3, 3],):
         super().__init__()
         self.HW = HW
         self.dim = dim
@@ -315,7 +312,7 @@ class SubSample(nn.Module):
         return out
 
 
-class SVTR2(nn.Module):
+class SVTR(nn.Module):
 
     def __init__(self,
                  img_size=[32, 256],

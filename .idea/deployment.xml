@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="ztl@10.200.3.80:22 password" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
       <paths name="zhengtianlun@bigvid">
         <serverdata>
@@ -9,17 +9,17 @@
           </mappings>
         </serverdata>
       </paths>
+      <paths name="zhengtl@10.200.5.134:22 password">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/zhengtl/MRN" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="ztl@10.176.53.102:1245 key">
         <serverdata>
           <mappings>
             <mapping deploy="/share/home/ztl/CIL_MLSTR" local="$PROJECT_DIR$" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="ztl@10.200.3.80:22 password">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/STR-Fewer-Labels" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>

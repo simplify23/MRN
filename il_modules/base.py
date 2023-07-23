@@ -1,28 +1,27 @@
 import os
 import time
 from collections import defaultdict
-from queue import Queue,PriorityQueue
+from queue import PriorityQueue
 
 import torch
-import torch.backends.cudnn as cudnn
 import torch.nn.init as init
 import torch.utils.data
 import numpy as np
 from tqdm import tqdm
 from tools.utils import CTCLabelConverter, AttnLabelConverter, Averager, adjust_learning_rate
-from data.dataset import hierarchical_dataset, AlignCollate, Batch_Balanced_Dataset
+from data.dataset import hierarchical_dataset
 from modules.model import Model
 from test import validation
-class bag_value():
-    def __init__(self,bag):
-        self.label, = bag
-        self.bag = bag
-        self.index, = bag.values()
-        self.len_label = len(self.label)
-    def __lt__(self, other):
-        if self.len_label !=other.len_label:
-            return self.len_label < other.len_label
-        return self.label > other.label
+# class bag_value():
+#     def __init__(self,bag):
+#         self.label, = bag
+#         self.bag = bag
+#         self.index, = bag.values()
+#         self.len_label = len(self.label)
+#     def __lt__(self, other):
+#         if self.len_label !=other.len_label:
+#             return self.len_label < other.len_label
+#         return self.label > other.label
 
 class Label():
     def __init__(self,label,index,score):
@@ -180,7 +179,7 @@ class BaseLearner(object):
             self.build_model()
 
         # filter that only require gradient descent
-        filtered_parameters = self.count_param(self.model)
+        filtered_parameters = self.count_param()
 
         # setup optimizer
         self.build_optimizer(filtered_parameters)
@@ -195,10 +194,10 @@ class BaseLearner(object):
                 else:
                     train_loader.get_dataset(taski, memory=self.opt.memory)
 
-            if self.opt.ch_list!=None:
-                name = self.opt.ch_list[taski]
-            else:
-                name = self.opt.lan_list[taski]
+            # if self.opt.ch_list!=None:
+            #     name = self.opt.ch_list[taski]
+            # else:
+            name = self.opt.lan_list[taski]
             saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_best_score.pth"
             # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
             self.model.load_state_dict(torch.load(f"{saved_best_model}"), strict=True)
@@ -229,7 +228,7 @@ class BaseLearner(object):
     def _init_train(self,start_iter,taski, train_loader, valid_loader):
         # loss averager
         train_loss_avg = Averager()
-        semi_loss_avg = Averager()
+        # semi_loss_avg = Averager()
 
         start_time = time.time()
         best_score = -1
@@ -282,7 +281,7 @@ class BaseLearner(object):
                 self.val(valid_loader, self.opt,  best_score, start_time, iteration,
                     train_loss_avg, taski)
                 train_loss_avg.reset()
-                semi_loss_avg.reset()
+                # semi_loss_avg.reset()
 
     def _update_representation(self,start_iter, taski, train_loader, valid_loader):
         self._init_train(start_iter, taski, train_loader, valid_loader)
@@ -291,19 +290,19 @@ class BaseLearner(object):
         # Calculate the means of old classes with newly trained network
         memory_num = self.opt.memory_num
         num_i = int(memory_num / (taski))
-        if self.opt.memory == "rehearsal" or self.opt.memory == "loss_max" or self.opt.memory == "cof_max":
-            self.build_current_memory(num_i,taski,train_loader)
-        elif self.opt.memory == "bag":
-            self.build_queue_bag_memory(num_i, taski, train_loader)
-        elif self.opt.memory == "score":
-            self.dataset_label_score(num_i, taski, train_loader)
-        else:
-            self.build_random_current_memory(num_i, taski, train_loader)
+        # if self.opt.memory == "loss_max" or self.opt.memory == "cof_max":
+        #     self.build_current_memory(num_i,taski,train_loader)
+        # # elif self.opt.memory == "bag":
+        # #     self.build_queue_bag_memory(num_i, taski, train_loader)
+        # elif self.opt.memory == "score":
+        #     self.dataset_label_score(num_i, taski, train_loader)
+        # else:
+        self.build_random_current_memory(num_i, taski, train_loader)
         if len(self.memory_index) != 0 and len(self.memory_index)*len(self.memory_index[0]) > memory_num:
-            if self.opt.memory == "rehearsal":
-                self.reduce_div_samplers(taski, taski_num=num_i)
-            else:
-                self.reduce_samplers(taski,taski_num =num_i)
+            # if self.opt.memory == "rehearsal":
+            #     self.reduce_div_samplers(taski, taski_num=num_i)
+            # else:
+            self.reduce_samplers(taski,taski_num =num_i)
         train_loader.get_dataset(taski,memory=self.opt.memory,index_list=self.memory_index)
         print("Is using rehearsal memory, has {} prev datasets, each has {}\n".format(len(self.memory_index),self.memory_index[0].size))
 
@@ -313,55 +312,40 @@ class BaseLearner(object):
         index_list = np.random.choice(range(len_data), taski_num, replace=False)
         self.memory_index.append(index_list)
 
-    def build_current_memory(self, taski_num, taski, train_loader):
-        prev_loader, len_data = train_loader.rehearsal_prev_model(taski)
-        # criterion = self.build_criterion("none")
-        loss = []
-        seq = []
-        for i, (image_tensors, labels) in enumerate(prev_loader):
-            image = image_tensors.to(self.device)
-            # labels_index, labels_length = self.converter.encode(
-            #     labels, batch_max_length=self.opt.batch_max_length
-            # )
-            # batch_size = image.size(0)
-            preds = self._old_network(image)['logits']
-            preds_list = torch.max(preds,-1)[0].cpu()
-            for pred_seq in preds_list:
-                cof = 0.0
-                for ch_cof in pred_seq:
-                    # cof *=ch_cof
-                    cof += ch_cof
-                seq.append(cof/len(pred_seq))
-            # default recognition loss part
-        #     if "CTC" in self.opt.Prediction:
-        #         preds = self._old_network(image)
-        #         preds_size = torch.IntTensor([preds.size(1)] * batch_size)
-        #         # B，T，C(max) -> T, B, C
-        #         preds_log_softmax = preds.log_softmax(2).permute(1, 0, 2)
-        #         loss_clf = criterion(preds_log_softmax, labels_index, preds_size, labels_length)
-        #     else:
-        #         preds = self.model(image, labels_index[:, :-1])  # align with Attention.forward
-        #         target = labels_index[:, 1:]  # without [SOS] Symbol
-        #         loss_clf = criterion(
-        #             preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
-        #         )
-        #     loss.append(loss_clf.cpu())
-        # loss = torch.cat(loss)
-        max_v, max_i = torch.topk(torch.Tensor(seq), k=int(taski_num), sorted=True, largest=True)
-        # min_v, min_i = torch.topk(loss, k=int(taski_num/2), sorted=True, largest=False)
-        # max_v, max_i = torch.topk(loss, k=int(taski_num), sorted=True, largest=True)
-        # index = torch.cat([max_i,min_i]).numpy(),0)
-        # self.memory_index.append(torch.cat([max_i,min_i]).numpy())
-        self.memory_index.append((max_i).numpy())
+    # def build_current_memory(self, taski_num, taski, train_loader):
+    #     prev_loader, len_data = train_loader.rehearsal_prev_model(taski)
+    #     # criterion = self.build_criterion("none")
+    #     seq = []
+    #     for i, (image_tensors, labels) in enumerate(prev_loader):
+    #         image = image_tensors.to(self.device)
+    #         # labels_index, labels_length = self.converter.encode(
+    #         #     labels, batch_max_length=self.opt.batch_max_length
+    #         # )
+    #         # batch_size = image.size(0)
+    #         preds = self._old_network(image)['logits']
+    #         preds_list = torch.max(preds,-1)[0].cpu()
+    #         for pred_seq in preds_list:
+    #             cof = 0.0
+    #             for ch_cof in pred_seq:
+    #                 # cof *=ch_cof
+    #                 cof += ch_cof
+    #             seq.append(cof/len(pred_seq))
+    #         # default recognition loss part
+    #     max_v, max_i = torch.topk(torch.Tensor(seq), k=int(taski_num), sorted=True, largest=True)
+    #     # min_v, min_i = torch.topk(loss, k=int(taski_num/2), sorted=True, largest=False)
+    #     # max_v, max_i = torch.topk(loss, k=int(taski_num), sorted=True, largest=True)
+    #     # index = torch.cat([max_i,min_i]).numpy(),0)
+    #     # self.memory_index.append(torch.cat([max_i,min_i]).numpy())
+    #     self.memory_index.append((max_i).numpy())
 
-    def reduce_div_samplers(self,taski,taski_num):
-        div = taski_num//2
-        for i in range(taski):
-            list_num = len(self.memory_index[i])
-            maxi = self.memory_index[i][:div]
-            mini = self.memory_index[i][list_num//2:list_num//2 + div]
-            self.memory_index[i] = np.concatenate([maxi,mini],-1)
-            print("----using memory {}".format(self.memory_index[i].size))
+    # def reduce_div_samplers(self,taski,taski_num):
+    #     div = taski_num//2
+    #     for i in range(taski):
+    #         list_num = len(self.memory_index[i])
+    #         maxi = self.memory_index[i][:div]
+    #         mini = self.memory_index[i][list_num//2:list_num//2 + div]
+    #         self.memory_index[i] = np.concatenate([maxi,mini],-1)
+    #         print("----using memory {}".format(self.memory_index[i].size))
 
     def reduce_samplers(self,taski,taski_num):
         div = taski_num
@@ -370,102 +354,102 @@ class BaseLearner(object):
             self.memory_index[i] = index
             print("----using memory {}".format(self.memory_index[i].size))
 
-    def dataset_label_score(self, taski_num, taski, train_loader):
-        prev_dataset, len_data = train_loader.rehearsal_prev_dataset(taski)
-        char = {}
-        # queue = PriorityQueue()
-        # max_length = 0
-        index_array = []
-        for index in range(len_data):
-            (image_tensor, label) = prev_dataset[index]
-            for ch in label:
-                if char.get(ch, None) == None:
-                    char[ch] = 1
-                else:
-                    char[ch] +=1
-        # print(char)
-        for index in range(len_data):
-            (image_tensor, label) = prev_dataset[index]
-            labels_length = len(label)
-            if labels_length == 0:
-                continue
-            label_score = 0.0
-            for ch in label:
-                if char.get(ch, None) != None:
-                    label_score += pow(char[ch],-1)
-            label_score = label_score / labels_length
-            index_array.append(Label(label,index,label_score))
-
-        # queue = [Queue() for i in range(max_length)]
-        index_array = sorted(index_array)[:taski_num]
-        data_list = [label_c.index for label_c in index_array]
-        print("samples get array {}--------".format(len(data_list)))
-        self.memory_index.append(np.array(data_list))
-
-
-    def build_queue_bag_memory(self, taski_num, taski, train_loader):
-        prev_dataset, len_data = train_loader.rehearsal_prev_dataset(taski)
-        data_len = defaultdict(list)
-        char = {}
-        max_length = 0
-        index_array = []
-        for index in range(len_data):
-            (image_tensors, labels) = prev_dataset[index]
-            # labels_index, labels_length = self.converter.encode(
-            #     labels, batch_max_length=self.opt.batch_max_length
-            # )
-            labels_length = len(labels)
-            data_len[labels_length].append({labels:index})
-            if labels_length > max_length:
-                max_length = labels_length
-        # queue = [Queue() for i in range(max_length)]
-        queue = [PriorityQueue() for i in range(max_length)]
-        for i in range(max_length):
-            # max-(0:max-1)  -> max : 1
-            len_label = max_length - i
-            # print("starting {}--------".format(len_label))
-            if i!=0:
-                for j in range(queue[len_label].qsize()):
-                    label = queue[len_label].get().bag
-                    # label = queue[len_label].get()
-                    char,queue,index_array = self.if_put_label(label,char, queue,len_label,index_array)
-
-            if data_len[len_label] == []:
-                continue
-            for label in data_len[len_label]:
-                char,queue,index_array= self.if_put_label(label, char, queue,len_label,index_array)
-            if len(index_array) > taski_num:
-                break
-        # print("starting {}--------".format(0))
-        print("task need {}, the lan need {}\n".format(taski_num,len(index_array)))
-        for j in range(queue[0].qsize()):
-            if len(index_array) > taski_num:
-                break
-            # label = queue[0].get()
-            label = queue[0].get().bag
-            char, queue,index_array= self.if_put_label(label, char, queue,0,index_array)
-        print("samples get array {}--------".format(len(index_array)))
-        self.memory_index.append(np.array(index_array[:taski_num]))
+    # def dataset_label_score(self, taski_num, taski, train_loader):
+    #     prev_dataset, len_data = train_loader.rehearsal_prev_dataset(taski)
+    #     char = {}
+    #     # queue = PriorityQueue()
+    #     # max_length = 0
+    #     index_array = []
+    #     for index in range(len_data):
+    #         (image_tensor, label) = prev_dataset[index]
+    #         for ch in label:
+    #             if char.get(ch, None) == None:
+    #                 char[ch] = 1
+    #             else:
+    #                 char[ch] +=1
+    #     # print(char)
+    #     for index in range(len_data):
+    #         (image_tensor, label) = prev_dataset[index]
+    #         labels_length = len(label)
+    #         if labels_length == 0:
+    #             continue
+    #         label_score = 0.0
+    #         for ch in label:
+    #             if char.get(ch, None) != None:
+    #                 label_score += pow(char[ch],-1)
+    #         label_score = label_score / labels_length
+    #         index_array.append(Label(label,index,label_score))
+    #
+    #     # queue = [Queue() for i in range(max_length)]
+    #     index_array = sorted(index_array)[:taski_num]
+    #     data_list = [label_c.index for label_c in index_array]
+    #     print("samples get array {}--------".format(len(data_list)))
+    #     self.memory_index.append(np.array(data_list))
 
 
-    def if_put_label(self, label,char,queue,len_value,index_array):
-        label_v = 0
-        string, = label
-        index, = label.values()
-        tmp_char = {}
-        for s in string:
-            if char.get(s, False) == False and tmp_char.get(s, False) == False:
-                tmp_char[s] = True
-                label_v += 1
-        # choose this index & bag is True
-        if label_v == len_value:
-            index_array.append(index)
-            # index_array.append({string: label_v})
-            char.update(tmp_char)
-        else:
-            queue[label_v].put(bag_value(label))
-            # queue[label_v].put(label)
-        return char,queue,index_array
+    # def build_queue_bag_memory(self, taski_num, taski, train_loader):
+    #     prev_dataset, len_data = train_loader.rehearsal_prev_dataset(taski)
+    #     data_len = defaultdict(list)
+    #     char = {}
+    #     max_length = 0
+    #     index_array = []
+    #     for index in range(len_data):
+    #         (image_tensors, labels) = prev_dataset[index]
+    #         # labels_index, labels_length = self.converter.encode(
+    #         #     labels, batch_max_length=self.opt.batch_max_length
+    #         # )
+    #         labels_length = len(labels)
+    #         data_len[labels_length].append({labels:index})
+    #         if labels_length > max_length:
+    #             max_length = labels_length
+    #     # queue = [Queue() for i in range(max_length)]
+    #     queue = [PriorityQueue() for i in range(max_length)]
+    #     for i in range(max_length):
+    #         # max-(0:max-1)  -> max : 1
+    #         len_label = max_length - i
+    #         # print("starting {}--------".format(len_label))
+    #         if i!=0:
+    #             for j in range(queue[len_label].qsize()):
+    #                 label = queue[len_label].get().bag
+    #                 # label = queue[len_label].get()
+    #                 char,queue,index_array = self.if_put_label(label,char, queue,len_label,index_array)
+    #
+    #         if data_len[len_label] == []:
+    #             continue
+    #         for label in data_len[len_label]:
+    #             char,queue,index_array= self.if_put_label(label, char, queue,len_label,index_array)
+    #         if len(index_array) > taski_num:
+    #             break
+    #     # print("starting {}--------".format(0))
+    #     print("task need {}, the lan need {}\n".format(taski_num,len(index_array)))
+    #     for j in range(queue[0].qsize()):
+    #         if len(index_array) > taski_num:
+    #             break
+    #         # label = queue[0].get()
+    #         label = queue[0].get().bag
+    #         char, queue,index_array= self.if_put_label(label, char, queue,0,index_array)
+    #     print("samples get array {}--------".format(len(index_array)))
+    #     self.memory_index.append(np.array(index_array[:taski_num]))
+
+
+    # def if_put_label(self, label,char,queue,len_value,index_array):
+    #     label_v = 0
+    #     string, = label
+    #     index, = label.values()
+    #     tmp_char = {}
+    #     for s in string:
+    #         if char.get(s, False) == False and tmp_char.get(s, False) == False:
+    #             tmp_char[s] = True
+    #             label_v += 1
+    #     # choose this index & bag is True
+    #     if label_v == len_value:
+    #         index_array.append(index)
+    #         # index_array.append({string: label_v})
+    #         char.update(tmp_char)
+    #     else:
+    #         queue[label_v].put(bag_value(label))
+    #         # queue[label_v].put(label)
+    #     return char,queue,index_array
 
     def val(self, valid_loader, opt, best_score, start_time, iteration,
             train_loss_avg, taski):
@@ -488,10 +472,10 @@ class BaseLearner(object):
         # (training should be done without referring test set).
         if current_score > best_score:
             best_score = current_score
-            if opt.ch_list != None:
-                name = opt.ch_list[taski]
-            else:
-                name = opt.lan_list[taski]
+            # if opt.ch_list != None:
+            #     name = opt.ch_list[taski]
+            # else:
+            name = opt.lan_list[taski]
             torch.save(
                 self.model.state_dict(),
                 f"./saved_models/{opt.exp_name}/{name}_{taski}_best_score.pth",
@@ -531,10 +515,10 @@ class BaseLearner(object):
         """ keep evaluation model and result logs """
         os.makedirs(f"./result/{self.opt.exp_name}", exist_ok=True)
         os.makedirs(f"./evaluation_log", exist_ok=True)
-        if self.opt.ch_list != None:
-            name = self.opt.ch_list[taski]
-        else:
-            name = self.opt.lan_list[taski]
+        # if self.opt.ch_list != None:
+        #     name = self.opt.ch_list[taski]
+        # else:
+        name = self.opt.lan_list[taski]
         saved_best_model = f"./saved_models/{self.opt.exp_name}/{name}_{taski}_best_score.pth"
         # os.system(f'cp {saved_best_model} ./result/{opt.exp_name}/')
         self.model.load_state_dict(torch.load(f"{saved_best_model}"))
@@ -564,7 +548,7 @@ class BaseLearner(object):
                     labels,
                     infer_time,
                     length_of_data,
-                ) = validation(self.model, self.criterion, valid_loader, self.converter, self.opt,val_choose="test",name=self.opt.lan_list[i//2],path=f"./saved_models/{self.opt.exp_name}/")
+                ) = validation(self.model, self.criterion, valid_loader, self.converter, self.opt,val_choose="test")
 
 
             task_accs.append(round(current_score,2))
@@ -602,57 +586,17 @@ class BaseLearner(object):
         return score17,score19
 
 
-    def count_param(self,model,trainable=True):
+    def count_param(self):
         filtered_parameters = []
         params_num = []
         for p in filter(lambda p: p.requires_grad, self.model.parameters()):
             filtered_parameters.append(p)
             params_num.append(np.prod(p.size()))
-        print("Trainable params num: {:.2f} M".format(sum(params_num) / 1000000))
+        print("Trainable params num: {:.2f} M\n".format(sum(params_num) / 1000000))
+        print("Total paramerters: {:.2f} M\n".format(sum(x.numel() for x in self.model.parameters()) / 1e6))
         self.write_log("Trainable params num: {:.2f} M\n".format(sum(params_num) / 1000000))
         return filtered_parameters
 
-    # def count_param(self,model,trainable=True):
-    #     filtered_parameters = []
-    #     params_num = []
-    #     device = torch.device("cuda:0" )
-    #
-    #     model = model.to(device)
-    #     # if str(next(model.parameters()).device) != "cuda:0":
-    #     #     model.to("cuda:0")
-    #     # for name, buffer in model.named_buffers():
-    #     #     if not buffer.device == torch.device("cuda:0"):
-    #     #         print(f"Moving buffer {name} from {buffer.device} to cuda:0")
-    #     #         buffer.to("cuda:0")
-    #     #
-    #     # for i, buffer in enumerate(model.buffers()):
-    #     #     if not buffer.device == torch.device("cuda:0"):
-    #     #         print(f"Buffer {i} device: {buffer.device}")
-    #
-    #     # import pdb
-    #     # pdb.set_trace()
-    #
-    #     # macs, params = profile(model, inputs=(torch.randn(1,4,64,256).to("cpu"),))
-    #     macs, params = get_model_complexity_info(model, (4, 64, 256), as_strings=True,
-    #                                          print_per_layer_stat=True, verbose=True)
-    #
-    #
-    #     model.train()
-    #     # print("FLOPS num: {:.3f}G ".format(macs.total()/1000**3))
-    #     # self.write_log("FLOPS num: {:.3f}G \n".format(macs.total()/1000**3))
-    #     print("FLOPS num: {} ".format(macs))
-    #     self.write_log("FLOPS : {} \n".format(macs))
-    #
-    #     if trainable == False:
-    #         params = sum(p.numel() for p in model.parameters())
-    #         print("All params num: {:.2f} M".format(params / 1000000))
-    #         self.write_log("All params num: {:.2f} M\n".format(params/ 1000000))
-    #     for p in filter(lambda p: p.requires_grad, model.parameters()):
-    #         filtered_parameters.append(p)
-    #         params_num.append(np.prod(p.size()))
-    #     print("Trainable params num: {:.2f} M".format(sum(params_num) / 1000000))
-    #     self.write_log("Trainable params num: {:.2f} M\n".format(sum(params_num) / 1000000))
-    #     return filtered_parameters
 
     def print_config(self,opt):
         self_log = "------------ selfions -------------\n"
@@ -668,7 +612,7 @@ class BaseLearner(object):
         with open(f"./saved_models/{self.opt.exp_name}/log_train.txt", "a") as log:
             log.write(line)
 
-    def write_data_log(self, line, name=None):
+    def write_data_log(self, line):
         with open(f"data_any.txt", "a+") as log:
             log.write(line)
 

@@ -1,13 +1,6 @@
-import logging
 import time
-
-import numpy as np
 import torch
-from torch import nn
-from torch.serialization import load
 from tqdm import tqdm
-from torch import optim
-from torch.nn import functional as F
 
 from il_modules.base import BaseLearner
 from tools.utils import Averager, adjust_learning_rate
@@ -87,10 +80,6 @@ class WA(BaseLearner):
                     preds.view(-1, preds.shape[-1]), target.contiguous().view(-1)
                 )
 
-            # fake_targets = self._total_classes - self._known_classes
-            # loss_clf = F.cross_entropy(
-            #     preds_log_softmax[:, self._known_classes:], fake_targets
-            # )
             loss_kd = _KD_loss(
                 preds.view(-1, preds.shape[-1])[:, start_index: self._known_classes],
                 old_preds.view(-1, old_preds.shape[-1])[:, start_index: self._known_classes],

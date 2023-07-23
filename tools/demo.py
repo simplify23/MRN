@@ -137,7 +137,7 @@ if __name__ == "__main__":
         help="character label",
     )
     parser.add_argument("--Aug", type=str, default="None", help="placeholder")
-    parser.add_argument("--semi", type=str, default="None", help="placeholder")
+    # parser.add_argument("--semi", type=str, default="None", help="placeholder")
     """ Model Architecture """
     parser.add_argument("--model_name", type=str, required=True, help="CRNN|TRBA")
     parser.add_argument(

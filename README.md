@@ -1,31 +1,36 @@
 
-Official PyTorch implementation of CIL_MLTSTR
+Official PyTorch implementation of MRN (Accepted by ICCV 2023)
+MRN: Multiplexed Routing Network for Incremental Multilingual Text Recognition
 
-**best config setting for MLT17+MLT19 = 200000 iter**
-TODO
+
 ## To Do List
 * [x] base
 * [x] lwf
 * [x] ewc
 * [x] wa
-* [x] random_memory
-* [x] loss_memory
-* [ ] der
-* [ ] queue_bag_memory
-
+* [x] der
+* [x] mrn
 
 
 ## Getting Started
 ### Dependency
 - This work was tested with PyTorch 1.6.0, CUDA 10.1 and python 3.6.
-- requirements : lmdb, pillow, torchvision, nltk, natsort, fire, tensorboard, tqdm
-
-      pip3 install lmdb pillow torchvision nltk natsort fire tensorboard tqdm
-
-
-### Download preprocessed lmdb dataset for traininig and evaluation 
+```
+conda create -n mrn python=3.7 -y
+conda activate mrn
+conda install pytorch==1.9.1 torchvision==0.10.1 torchaudio==0.9.1 cudatoolkit=11.3 -c pytorch -c conda-forge
+pip install torch==1.9.1+cu111 torchvision==0.10.1+cu111 torchaudio==0.9.1 -f https://download.pytorch.org/whl/torch_stable.html
+```
+- requirements : 
+```
+pip3 install lmdb pillow torchvision nltk natsort fire tensorboard tqdm opencv-python einops timm mmcv shapely scipy
+pip install mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.1/index.html
+```
+### Download lmdb dataset for traininig and evaluation 
 See [`data.md`](https://github.com/ku21fan/STR-Fewer-Labels/blob/main/data.md)
-
+```
+python3 tiny_train.py --config=config/crnn_3090.py --exp_name CRNN_real
+```
 <h3 id="pretrained_models"> Run demo with pretrained model <a href="https://colab.research.google.com/github/ku21fan/STR-Fewer-Labels/blob/master/demo_in_colab.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a> </h3> 
 
 1. [Download pretrained model](https://www.dropbox.com/sh/23adceu2i85c4x1/AACLmaiL43Jy8eYIVVUkZ344a?dl=0) <br>
@@ -55,22 +60,7 @@ There are 2 models (CRNN or TRBA) and 5 different settings of each model.
    ```
    CUDA_VISIBLE_DEVICES=0 python3 train.py --model_name CRNN --exp_name CRNN_aug --Aug Crop90-Rot15
    ```
-
-3. Train CRNN with semi-supervised methods Pseudo Label (PL)
-   ```
-   CUDA_VISIBLE_DEVICES=0 python3 train.py --model_name CRNN --exp_name CRNN_PL --Aug Crop90-Rot15 \
-   --semi Pseudo --model_for_PseudoLabel saved_models/CRNN_aug/best_score.pth
-   ```
-
-4. Pretrain with RotNet (For TRBA, use `--model_name NR`)
-   ```
-   CUDA_VISIBLE_DEVICES=0 python3 pretrain.py --model_name NV --exp_name NV_Pretrain_RotNet --self RotNet
-   ```
-   Train CRNN with RotNet initialization <br>
-   ```
-   CUDA_VISIBLE_DEVICES=0 python3 train.py --model_name CRNN --exp_name CRNN_NVInitRotNet \
-   --saved_model saved_models/NV_Pretrain_RotNet/best_score.pth --Aug Crop90-Rot15
-   ```      
+   
 5. Train with PL + RotNet (PR).
    ```
    CUDA_VISIBLE_DEVICES=0 python3 train.py --model_name CRNN --exp_name CRNN_PR \
@@ -96,7 +86,6 @@ train.py (as a default, evaluate trained model on 6 benchmark datasets at the en
 * `--batch_ratio`: assign ratio for each selected data in the batch. default is '1 / number of datasets'.
 * `--model_name`: select model 'CRNN' or 'TRBA'.
 * `--Aug`: whether to use augmentation |None|Blur|Crop|Rot|
-* `--semi`: whether to use semi-supervised learning |None|PL|MT|
 * `--saved_model`: assign saved model to use pretrained model such as RotNet and MoCo.
 * `--self_pre`: whether to use self-supversied pretrained model |RotNet|MoCo|. default: RotNet
 
@@ -143,9 +132,5 @@ Please consider citing this work in your publications if it helps your research.
 }
 ```
 
-## Contact
-Feel free to contact us if there is any question: Jeonghun Baek ku21fang@gmail.com
-
 ## License
-For code: MIT.
-For preprocessed datasets: check the license of each dataset in [data.md](https://github.com/ku21fan/STR-Fewer-Labels/blob/main/data.md)
+This project is released under the Apache 2.0 license.
