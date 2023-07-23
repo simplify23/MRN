@@ -6,10 +6,6 @@
 [![In Proc. ICCV 2023](http://img.shields.io/badge/ECCV-2022-6790ac)](https://www.ecva.net/papers/eccv_2022/papers_ECCV/html/556_ECCV_2022_paper.php)
 [![Gradio demo](https://img.shields.io/badge/%F0%9F%A4%97%20demo-Gradio-ff7c00)](https://huggingface.co/spaces/baudm/PARSeq-OCR)
 
-[**Darwin Bautista**](https://github.com/baudm) and [**Rowel Atienza**](https://github.com/roatienza)
-
-Electrical and Electronics Engineering Institute<br/>
-University of the Philippines, Diliman
 
 [Method](#method-tldr) | [Sample Results](#sample-results) | [Getting Started](#getting-started) | [FAQ](#frequently-asked-questions) | [Training](#training) | [Evaluation](#evaluation) | [Citation](#citation)
 
