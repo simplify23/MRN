@@ -70,6 +70,9 @@ tiny_train.py (as a default, evaluate trained model on IMLTR datasets at the end
 * `--batch_ratio`: assign ratio for each selected data in the batch. default is '1 / number of datasets'.
 * `--Aug`: whether to use augmentation |None|Blur|Crop|Rot|
 
+### Data Analysis
+The experimental results of each task are recorded in `data_any.txt` and can be used for analysis of the data.
+
 
 ## Acknowledgements
 This implementation has been based on these repositories:
