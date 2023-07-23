@@ -19,6 +19,7 @@ This project is a toolkit for the novel scenario of Incremental Multilingual Tex
 
 </div>
 
+- A introduction (in Chinese) is available [here](https://zhuanlan.zhihu.com/p/643948935).
 
 ## Methods
 ### Incremental Learning Methods 
