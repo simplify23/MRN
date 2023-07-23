@@ -174,12 +174,6 @@ def build_arg(parser):
         "--imgW", type=int, default=100, help="the width of the input image"
     )
     parser.add_argument(
-        "--character",
-        type=str,
-        default="0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~",
-        help="character label",
-    )
-    parser.add_argument(
         "--NED", action="store_true", help="For Normalized edit_distance"
     )
     parser.add_argument(
