@@ -41,7 +41,6 @@ def load_dict(path,char):
     line = f.readline()
     while line:
         ch_list.append(line.strip("\n"))
-        # print(line)
         line = f.readline()
     f.close()
 
@@ -60,12 +59,6 @@ def build_arg(parser):
         default="config/crnn.py",
         help="path to validation dataset",
     )
-    # parser.add_argument(
-    #     "--train_data",
-    #     # default="data_CVPR2021/training/label/",
-    #     default="../dataset/MLT2017/val_gt/mlt_2017_val",
-    #     help="path to training dataset",
-    # )
     parser.add_argument(
         "--valid_data",
         default="../dataset/MLT2017/val_gt/mlt_2017_val",
@@ -87,9 +80,6 @@ def build_arg(parser):
     parser.add_argument(
         "--log_multiple_test", action="store_true", help="log_multiple_test"
     )
-    # parser.add_argument(
-    #     "--FT", type=str, default="init", help="whether to do fine-tuning |init|freeze|"
-    # )
     parser.add_argument(
         "--grad_clip", type=float, default=5, help="gradient clipping value. default=5"
     )
@@ -159,7 +149,7 @@ def build_arg(parser):
         type=str,
         # default="label",
         default="../dataset/MLT2017/val_gt/mlt_2017_val",
-        help="select training data. default is `label` which means 11 real labeled datasets",
+        help="select training data.",
     )
     parser.add_argument(
         "--batch_ratio",
@@ -197,28 +187,6 @@ def build_arg(parser):
         default="None",
         help="whether to use augmentation |None|Blur|Crop|Rot|",
     )
-    # """ Semi-supervised learning """
-    # parser.add_argument(
-    #     "--semi",
-    #     type=str,
-    #     default="None",
-    #     help="whether to use semi-supervised learning |None|PL|MT|",
-    # )
-    # parser.add_argument(
-    #     "--MT_C", type=float, default=1, help="Mean Teacher consistency weight"
-    # )
-    # parser.add_argument(
-    #     # "--MT_alpha", type=float, default=0.999, help="Mean Teacher EMA decay"
-    # )
-    # parser.add_argument(
-    #     # "--model_for_PseudoLabel", default="", help="trained model for PseudoLabel"
-    # )
-    # parser.add_argument(
-    #     "--self_pre",
-    #     type=str,
-    #     default="RotNet",
-    #     help="whether to use `RotNet` or `MoCo` pretrained model.",
-    # )
     """ exp_name and etc """
     parser.add_argument("--exp_name", help="Where to store logs and models")
     parser.add_argument(
@@ -231,18 +199,9 @@ def build_arg(parser):
 
 def train(opt, log):
     # ["Latin", "Chinese", "Arabic", "Japanese", "Korean", "Bangla","Hindi","Symbols"]
-    # train_datasets = ["mlt_2017_train_Latin", "mlt_2017_train_Chinese", "mlt_2017_train_Arabic", "mlt_2017_train_Japanese", "mlt_2017_train_Korean", "mlt_2017_train_Bangla", "mlt_2017_train_Symbols"]
-    # valid_datasets = ["mlt_2017_val_Latin", "mlt_2017_val_Chinese", "mlt_2017_val_Arabic", "mlt_2017_val_Japanese", "mlt_2017_val_Korean", "mlt_2017_val_Bangla", "mlt_2017_val_Symbols"]
-    # train_datasets = [opt.root_pefix + "_train_" + lan for lan in opt.lan_list]
-    # valid_datasets = [opt.root_pefix + "_test_" + lan for lan in opt.lan_list]
     write_data_log(f"----------- {opt.exp_name} ------------\n")
     print(f"----------- {opt.exp_name} ------------\n")
 
-    # if opt.ch_list!=None:
-    #     train_datasets = [ch+"/train" for ch in opt.ch_list]
-    #     valid_datasets = [ch+"/test" for ch in opt.ch_list]
-    # else:
-    # train_datasets = [lan for lan in opt.lan_list]
     valid_datasets = train_datasets = [lan for lan in opt.lan_list]
 
     best_scores = []
@@ -448,40 +407,6 @@ def test(AlignCollate_valid,valid_datas,model,criterion,converter,opt,best_score
     print(acc_log)
     log.write(acc_log)
     return best_scores,log
-
-# def change_model(opt, model):
-#     """ model configuration """
-#     # model.module.reset_class(opt, device)
-#     reset_class(model.module, opt, device)
-#     # data parallel for multi-GPU
-#     model.train()
-#     return model
-
-
-# def build_model(opt, log):
-#     """ model configuration """
-#
-#     model = Model(opt)
-#
-#     # weight initialization
-#     for name, param in model.named_parameters():
-#         if "localization_fc2" in name:
-#             print(f"Skip {name} as it is already initialized")
-#             continue
-#         try:
-#             if "bias" in name:
-#                 init.constant_(param, 0.0)
-#             elif "weight" in name:
-#                 init.kaiming_normal_(param)
-#         except Exception as e:  # for batchnorm.
-#             if "weight" in name:
-#                 param.data.fill_(1)
-#             continue
-#
-#     # data parallel for multi-GPU
-#     model = torch.nn.DataParallel(model).to(device)
-#     model.train()
-#     return model,log
 
 
 if __name__ == "__main__":
