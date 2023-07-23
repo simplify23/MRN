@@ -340,7 +340,7 @@ class MRNNet(nn.Module):
             self.patch = 65
         self.router = "dm-router"  #dm-router
         self.layer_num = 1
-        self.beta = 10
+        self.beta = 1
 
     @property
     def feature_dim(self):
@@ -361,8 +361,8 @@ class MRNNet(nn.Module):
             index = None
         # elif is_train == False:
         #     features, index = self.cross_test(image)
-        # elif is_train == False:
-        #     features, index = self.cross_forward_expert(image, text, is_train)
+        elif is_train == False:
+            features, index = self.cross_forward_expert(image, text, is_train)
         else:
             # features,index = self.cross_forwardv2(image)
             features, index = self.cross_forward(image,text,is_train)
