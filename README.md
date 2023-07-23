@@ -73,6 +73,8 @@ tiny_train.py (as a default, evaluate trained model on IMLTR datasets at the end
 ### Data Analysis
 The experimental results of each task are recorded in `data_any.txt` and can be used for analysis of the data.
 
+### CheckPoint training
+
 
 ## Acknowledgements
 This implementation has been based on these repositories:
