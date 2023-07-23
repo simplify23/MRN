@@ -2,24 +2,28 @@
 
 # MRN: Multiplexed Routing Network <br/> for Incremental Multilingual Text Recognition
 
-[Method](#Methods-Reproduced) |[Paper](https://arxiv.org/abs/2305.14758) |[Getting Started](#getting-started) | [IMLTR Dataset](#IMLTRDataset) | [Training](#training) | [Citation](#citation)
+[Paper](https://arxiv.org/abs/2305.14758) | [Method](#methods) |[IMLTR Dataset](#imltr-dataset) | [Getting Started](#getting-started) | [Citation](#citation)
 
 </div>
 
-Scene Text Recognition (STR) models use language context to be more robust against noisy or corrupted images. Recent approaches like ABINet use a standalone or external Language Model (LM) for prediction refinement. In this work, we show that the external LM&mdash;which requires upfront allocation of dedicated compute capacity&mdash;is inefficient for STR due to its poor performance vs cost characteristics. We propose a more efficient approach using **p**ermuted **a**uto**r**egressive **seq**uence (PARSeq) models. View our ECCV [poster](https://drive.google.com/file/d/19luOT_RMqmafLMhKQQHBnHNXV7fOCRfw/view) and [presentation](https://drive.google.com/file/d/11VoZW4QC5tbMwVIjKB44447uTiuCJAAD/view) for a brief overview.
+It started as code for the paper:
 
+**MRN: Multiplexed Routing Network for Incremental Multilingual Text Recognition**
+(Accepted by ICCV 2023)
 
-Official PyTorch implementation of MRN (Accepted by ICCV 2023)
-MRN: Multiplexed Routing Network for Incremental Multilingual Text Recognition
+This project is a toolkit for the novel scenario of Incremental Multilingual Text Recognition (IMLTR), the project supports many incremental learning methods and proposes a more applicable method for IMLTR: Multiplexed Routing Network (MRN) and the corresponding dataset. The project provides an efficient framework to assist in developing new methods and analyzing existing ones under the IMLTR task, and we hope it will advance the IMLTR community.
 
+<div align="center">
+    
 ![image](https://github.com/simplify23/MRN/assets/39580716/b865e4c3-e1a4-4fb7-a0d2-91ebc959af46)
 
+</div>
 
 
-### Methods Reproduced
+## Methods
 
 * [x] Base: Baseline method which simply updates parameters on new tasks.
-* [x] Joint: Upound method which simply updates parameters on new tasks.
+* [x] Joint: Bound method: data for all tasks are trained at once, an upper bound for the method.
 * [x] [EWC](https://arxiv.org/abs/1612.00796) `[PNAS2017]`: Overcoming catastrophic forgetting in neural networks. 
 * [x] [LwF](https://arxiv.org/abs/1911.07053) `[ECCV2016]`:  Learning without Forgetting.
 * [x] [WA](https://arxiv.org/abs/1911.07053) `[CVPR2020]`: Maintaining Discrimination and Fairness in Class Incremental Learning. 
@@ -27,6 +31,16 @@ MRN: Multiplexed Routing Network for Incremental Multilingual Text Recognition
 * [x] [MRN](https://arxiv.org/abs/2305.14758) `[ICCV2023]`: MRN: Multiplexed Routing Network for Incremental Multilingual Text Recognition. 
 
 ### IMLTR Dataset
+
+```
+dataset
+├── MLT17_IL
+│   ├── test_2017
+│   ├── train_2017
+├── MLT19_IL
+│   ├── test_2019
+│   ├── train_2019
+```
 
 
 ## Getting Started
@@ -41,10 +55,10 @@ pip install torch==1.9.1+cu111 torchvision==0.10.1+cu111 torchaudio==0.9.1 -f ht
 - requirements : 
 ```
 pip3 install lmdb pillow torchvision nltk natsort fire tensorboard tqdm opencv-python einops timm mmcv shapely scipy
-pip install mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.1/index.html
+pip3 install mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.1/index.html
 ```
-### IMLTR Dataset
-See [`data.md`](https://github.com/ku21fan/STR-Fewer-Labels/blob/main/data.md)
+
+### Training
 ```
 python3 tiny_train.py --config=config/crnn_3090.py --exp_name CRNN_real
 ```
@@ -68,33 +82,6 @@ There are 2 models (CRNN or TRBA) and 5 different settings of each model.
    --saved_model TRBA-Baseline-real.pth
    ```
 
-### Training
-1. Train CRNN model with only real data.
-
-       CUDA_VISIBLE_DEVICES=0 python3 train.py --model_name CRNN --exp_name CRNN_real
-
-2. Train CRNN with augmentation (For TRBA, use `--Aug Blur5-Crop99`)
-   ```
-   CUDA_VISIBLE_DEVICES=0 python3 train.py --model_name CRNN --exp_name CRNN_aug --Aug Crop90-Rot15
-   ```
-   
-5. Train with PL + RotNet (PR).
-   ```
-   CUDA_VISIBLE_DEVICES=0 python3 train.py --model_name CRNN --exp_name CRNN_PR \
-   --saved_model saved_models/NV_Pretrain_RotNet/best_score.pth --Aug Crop90-Rot15 \
-   --semi Pseudo --model_for_PseudoLabel saved_models/CRNN_NVInitRotNet/best_score.pth
-   ```
-
-Try our best accuracy model [TRBA_PR](https://www.dropbox.com/s/s0c26oe8dvk7tsg/TRBA-PR.pth?dl=0) by replacing CRNN to TRBA and `--Aug Crop90-Rot15` to `--Aug Blur5-Crop99`.
-
-### Evaluation
-Test CRNN model.
-```
-CUDA_VISIBLE_DEVICES=0 python3 test.py --eval_type benchmark --model_name CRNN \
---saved_model saved_models/CRNN_real/best_score.pth
-```
-
-
 ### Arguments
 train.py (as a default, evaluate trained model on 6 benchmark datasets at the end of training.)
 * `--train_data`: folder path to training lmdb dataset. default: `data_CVPR2021/training/label/`
@@ -104,35 +91,6 @@ train.py (as a default, evaluate trained model on 6 benchmark datasets at the en
 * `--model_name`: select model 'CRNN' or 'TRBA'.
 * `--Aug`: whether to use augmentation |None|Blur|Crop|Rot|
 * `--saved_model`: assign saved model to use pretrained model such as RotNet and MoCo.
-* `--self_pre`: whether to use self-supversied pretrained model |RotNet|MoCo|. default: RotNet
-
-
-test.py
-* `--eval_data`: folder path to evaluation lmdb dataset. As a default, when you use `eval_type`, this will be set to `data_CVPR2021/evaluation/benchmark/` or `data_CVPR2021/evaluation/addition/`
-* `--eval_type`: select 'benchmark' to evaluate 6 evaluation datasets. select 'addition' to evaluate 7 additionally collected datasets (used in Table 6 in our supplementary material).
-* `--model_name`: select model 'CRNN' or 'TRBA'.
-* `--saved_model`: assign saved model to evaluation.
-
-demo.py
-* `--image_folder`: path to image_folder which contains text images. default: `demo_image/`
-* `--model_name`: select model 'CRNN' or 'TRBA'.
-* `--saved_model`: assign saved model to use.
-
-
-## When you need to train on your own dataset or Non-Latin language datasets.
-1. Create your own lmdb dataset. You may need `pip3 install opencv-python` to `import cv2`.
-
-       python3 create_lmdb_dataset.py --inputPath data/ --gtFile data/gt.txt --outputPath result/
-
-   At this time, `gt.txt` should be `{imagepath}\t{label}\n` <br>
-   For example
-   ```
-   test/word_1.png Tiredness
-   test/word_2.png kills
-   test/word_3.png A
-   ...
-   ```
-2. Modify `--select_data`, `--batch_ratio`, and `opt.character`, see [this issue](https://github.com/clovaai/deep-text-recognition-benchmark/issues/85).
 
 
 ## Acknowledgements
