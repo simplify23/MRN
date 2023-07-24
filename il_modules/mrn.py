@@ -2,9 +2,6 @@ import time
 import os
 from tqdm import tqdm
 import torch
-from torch import nn
-from torch.nn import functional as F
-from torch.autograd import Variable
 from torch.utils.data import DataLoader
 import torch.nn.init as init
 
@@ -153,7 +150,6 @@ class MRN(BaseLearner):
         self.taski_criterion = torch.nn.CrossEntropyLoss(reduction="mean").to(
             self.device
         )
-        # self.taski_criterion = FocalLoss().to(self.device)
 
         if taski > 0:
             for i in range(taski):
@@ -178,14 +174,6 @@ class MRN(BaseLearner):
             num_i = memory_num
         else:
             num_i = int(memory_num / (taski))
-        # self.build_queue_bag_memory(num_i, taski, train_loader)
-        # if self.opt.memory == "rehearsal" or self.opt.memory == "loss_max" or self.opt.memory == "cof_max":
-        #     self.build_current_memory(num_i, taski, train_loader)
-        # # elif self.opt.memory == "bag":
-        # #     self.build_queue_bag_memory(num_i, taski, train_loader)
-        # elif self.opt.memory == "score":
-        #     self.dataset_label_score(num_i, taski, train_loader)
-        # else:
         self.build_random_current_memory(num_i, taski, train_loader)
         if memory_num < 5000:
             if len(self.memory_index) != 0 and len(self.memory_index)*len(self.memory_index[0]) > memory_num:
@@ -369,8 +357,6 @@ class MRN(BaseLearner):
                 # loss_aux = self.criterion(
                 #     aux_logits.view(-1, aux_logits.shape[-1]), aux_targets.contiguous().view(-1)
                 # )
-            # loss = loss_clf + loss_aux
-            # loss = loss_clf + pi * taski_loss
             loss = pi * loss_clf + taski_loss
             # loss.requires_grad_(True)
             self.model.zero_grad()

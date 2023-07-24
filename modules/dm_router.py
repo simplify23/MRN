@@ -32,24 +32,6 @@ class ChannelDomainGating(nn.Module):
         v = v.permute(0, 2, 1)
         return x * v
 
-# class GatingMlpBlock(nn.Module):
-#     def __init__(self, d_model, d_ffn, seq_len):
-#         super().__init__()
-#
-#         self.norm = nn.LayerNorm(d_model)
-#         self.proj_1 = nn.Linear(d_model, d_ffn)
-#         self.activation = nn.GELU()
-#         self.spatial_gating_unit = SpatialGatingUnit(d_ffn, seq_len)
-#         self.proj_2 = nn.Linear(d_ffn // 2, d_model)
-#     def forward(self, x):
-#         shorcut = x.clone()
-#         x = self.norm(x)
-#         x = self.proj_1(x)
-#         x = self.activation(x)
-#         x = self.spatial_gating_unit(x)
-#         x = self.proj_2(x)
-#         return x + shorcut
-
 class DM_Router(nn.Module):
     def __init__(self, channel, d_ffn, patch,domain):
         super().__init__()

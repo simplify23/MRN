@@ -7,7 +7,7 @@ from natsort import natsorted
 import PIL
 import lmdb
 import torch
-from torch.utils.data import Dataset, ConcatDataset, Subset
+from torch.utils.data import Dataset, ConcatDataset
 import torchvision.transforms as transforms
 
 from data.transform import CVGeometry, CVDeterioration, CVColorJitter

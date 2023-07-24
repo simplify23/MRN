@@ -1,7 +1,5 @@
 import os
 import time
-from collections import defaultdict
-from queue import PriorityQueue
 
 import torch
 import torch.nn.init as init
@@ -12,16 +10,7 @@ from tools.utils import CTCLabelConverter, AttnLabelConverter, Averager, adjust_
 from data.dataset import hierarchical_dataset
 from modules.model import Model
 from test import validation
-# class bag_value():
-#     def __init__(self,bag):
-#         self.label, = bag
-#         self.bag = bag
-#         self.index, = bag.values()
-#         self.len_label = len(self.label)
-#     def __lt__(self, other):
-#         if self.len_label !=other.len_label:
-#             return self.len_label < other.len_label
-#         return self.label > other.label
+
 
 class Label():
     def __init__(self,label,index,score):
@@ -290,13 +279,6 @@ class BaseLearner(object):
         # Calculate the means of old classes with newly trained network
         memory_num = self.opt.memory_num
         num_i = int(memory_num / (taski))
-        # if self.opt.memory == "loss_max" or self.opt.memory == "cof_max":
-        #     self.build_current_memory(num_i,taski,train_loader)
-        # # elif self.opt.memory == "bag":
-        # #     self.build_queue_bag_memory(num_i, taski, train_loader)
-        # elif self.opt.memory == "score":
-        #     self.dataset_label_score(num_i, taski, train_loader)
-        # else:
         self.build_random_current_memory(num_i, taski, train_loader)
         if len(self.memory_index) != 0 and len(self.memory_index)*len(self.memory_index[0]) > memory_num:
             # if self.opt.memory == "rehearsal":
@@ -312,144 +294,12 @@ class BaseLearner(object):
         index_list = np.random.choice(range(len_data), taski_num, replace=False)
         self.memory_index.append(index_list)
 
-    # def build_current_memory(self, taski_num, taski, train_loader):
-    #     prev_loader, len_data = train_loader.rehearsal_prev_model(taski)
-    #     # criterion = self.build_criterion("none")
-    #     seq = []
-    #     for i, (image_tensors, labels) in enumerate(prev_loader):
-    #         image = image_tensors.to(self.device)
-    #         # labels_index, labels_length = self.converter.encode(
-    #         #     labels, batch_max_length=self.opt.batch_max_length
-    #         # )
-    #         # batch_size = image.size(0)
-    #         preds = self._old_network(image)['logits']
-    #         preds_list = torch.max(preds,-1)[0].cpu()
-    #         for pred_seq in preds_list:
-    #             cof = 0.0
-    #             for ch_cof in pred_seq:
-    #                 # cof *=ch_cof
-    #                 cof += ch_cof
-    #             seq.append(cof/len(pred_seq))
-    #         # default recognition loss part
-    #     max_v, max_i = torch.topk(torch.Tensor(seq), k=int(taski_num), sorted=True, largest=True)
-    #     # min_v, min_i = torch.topk(loss, k=int(taski_num/2), sorted=True, largest=False)
-    #     # max_v, max_i = torch.topk(loss, k=int(taski_num), sorted=True, largest=True)
-    #     # index = torch.cat([max_i,min_i]).numpy(),0)
-    #     # self.memory_index.append(torch.cat([max_i,min_i]).numpy())
-    #     self.memory_index.append((max_i).numpy())
-
-    # def reduce_div_samplers(self,taski,taski_num):
-    #     div = taski_num//2
-    #     for i in range(taski):
-    #         list_num = len(self.memory_index[i])
-    #         maxi = self.memory_index[i][:div]
-    #         mini = self.memory_index[i][list_num//2:list_num//2 + div]
-    #         self.memory_index[i] = np.concatenate([maxi,mini],-1)
-    #         print("----using memory {}".format(self.memory_index[i].size))
-
     def reduce_samplers(self,taski,taski_num):
         div = taski_num
         for i in range(taski):
             index = self.memory_index[i][:div]
             self.memory_index[i] = index
             print("----using memory {}".format(self.memory_index[i].size))
-
-    # def dataset_label_score(self, taski_num, taski, train_loader):
-    #     prev_dataset, len_data = train_loader.rehearsal_prev_dataset(taski)
-    #     char = {}
-    #     # queue = PriorityQueue()
-    #     # max_length = 0
-    #     index_array = []
-    #     for index in range(len_data):
-    #         (image_tensor, label) = prev_dataset[index]
-    #         for ch in label:
-    #             if char.get(ch, None) == None:
-    #                 char[ch] = 1
-    #             else:
-    #                 char[ch] +=1
-    #     # print(char)
-    #     for index in range(len_data):
-    #         (image_tensor, label) = prev_dataset[index]
-    #         labels_length = len(label)
-    #         if labels_length == 0:
-    #             continue
-    #         label_score = 0.0
-    #         for ch in label:
-    #             if char.get(ch, None) != None:
-    #                 label_score += pow(char[ch],-1)
-    #         label_score = label_score / labels_length
-    #         index_array.append(Label(label,index,label_score))
-    #
-    #     # queue = [Queue() for i in range(max_length)]
-    #     index_array = sorted(index_array)[:taski_num]
-    #     data_list = [label_c.index for label_c in index_array]
-    #     print("samples get array {}--------".format(len(data_list)))
-    #     self.memory_index.append(np.array(data_list))
-
-
-    # def build_queue_bag_memory(self, taski_num, taski, train_loader):
-    #     prev_dataset, len_data = train_loader.rehearsal_prev_dataset(taski)
-    #     data_len = defaultdict(list)
-    #     char = {}
-    #     max_length = 0
-    #     index_array = []
-    #     for index in range(len_data):
-    #         (image_tensors, labels) = prev_dataset[index]
-    #         # labels_index, labels_length = self.converter.encode(
-    #         #     labels, batch_max_length=self.opt.batch_max_length
-    #         # )
-    #         labels_length = len(labels)
-    #         data_len[labels_length].append({labels:index})
-    #         if labels_length > max_length:
-    #             max_length = labels_length
-    #     # queue = [Queue() for i in range(max_length)]
-    #     queue = [PriorityQueue() for i in range(max_length)]
-    #     for i in range(max_length):
-    #         # max-(0:max-1)  -> max : 1
-    #         len_label = max_length - i
-    #         # print("starting {}--------".format(len_label))
-    #         if i!=0:
-    #             for j in range(queue[len_label].qsize()):
-    #                 label = queue[len_label].get().bag
-    #                 # label = queue[len_label].get()
-    #                 char,queue,index_array = self.if_put_label(label,char, queue,len_label,index_array)
-    #
-    #         if data_len[len_label] == []:
-    #             continue
-    #         for label in data_len[len_label]:
-    #             char,queue,index_array= self.if_put_label(label, char, queue,len_label,index_array)
-    #         if len(index_array) > taski_num:
-    #             break
-    #     # print("starting {}--------".format(0))
-    #     print("task need {}, the lan need {}\n".format(taski_num,len(index_array)))
-    #     for j in range(queue[0].qsize()):
-    #         if len(index_array) > taski_num:
-    #             break
-    #         # label = queue[0].get()
-    #         label = queue[0].get().bag
-    #         char, queue,index_array= self.if_put_label(label, char, queue,0,index_array)
-    #     print("samples get array {}--------".format(len(index_array)))
-    #     self.memory_index.append(np.array(index_array[:taski_num]))
-
-
-    # def if_put_label(self, label,char,queue,len_value,index_array):
-    #     label_v = 0
-    #     string, = label
-    #     index, = label.values()
-    #     tmp_char = {}
-    #     for s in string:
-    #         if char.get(s, False) == False and tmp_char.get(s, False) == False:
-    #             tmp_char[s] = True
-    #             label_v += 1
-    #     # choose this index & bag is True
-    #     if label_v == len_value:
-    #         index_array.append(index)
-    #         # index_array.append({string: label_v})
-    #         char.update(tmp_char)
-    #     else:
-    #         queue[label_v].put(bag_value(label))
-    #         # queue[label_v].put(label)
-    #     return char,queue,index_array
 
     def val(self, valid_loader, opt, best_score, start_time, iteration,
             train_loss_avg, taski):

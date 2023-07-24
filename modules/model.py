@@ -4,7 +4,6 @@ from einops import rearrange
 import torch.nn as nn
 
 from modules.dm_router import DM_Router
-# from modules.mlp import PermutatorBlock
 from modules.transformation import TPS_SpatialTransformerNetwork
 from modules.feature_extraction import (
     VGG_FeatureExtractor,
@@ -364,36 +363,6 @@ class MRNNet(nn.Module):
         zero = torch.ones([B,T,total-know],dtype=torch.float).to(feature.device)
         return torch.cat([feature,zero],dim=-1)
 
-    # def cross_forward(self, image):
-    #     """Transformation stage"""
-    #     features = [convnet(image)for convnet in self.model]
-    #     route_info = torch.cat([feature["feature"] for feature in features],-1)
-    #     route_info = self.gmlp(route_info)
-    #     route_info = self.channel_route(route_info).permute(0,2,1)
-    #     # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
-    #     index = self.route(route_info.contiguous())
-    #     # index = self.softargmax1d(torch.squeeze(index, -1))
-    #     index = torch.max(torch.squeeze(index, -1),-1)[1]
-    #     # index = torch.mean(torch.squeeze(index, -1), -1)
-    #
-    #     # feature_array = torch.stack(features, 1)
-    #     features = [feature["predict"] for feature in features]
-    #     B,T,C = features[-1].size()
-    #     list_len = len(features)
-    #     normal_feat = []
-    #     for i in range(list_len-1):
-    #         feat = self.pad_zeros_features(features[i],total=C)
-    #         normal_feat.append(feat)
-    #     normal_feat.append(features[-1])
-    #
-    #     output = torch.stack([normal_feat[index_one][i,:,:]for i,index_one in enumerate(index)],0)
-    #
-    #     # out=self.fc(features) #{logics: self.fc(features)}
-    #     # out = dict({"logits":features[int(index)],"features":None,"aux_logits":None})
-    #     #
-    #     # return out  # [b, num_steps, opt.num_class]
-    #     return output.contiguous(),index
-
     def cross_forward_expert(self, image, text=None, is_train=True):
         """Transformation stage"""
         features = [convnet(image,text,is_train) for convnet in self.model]
@@ -452,36 +421,6 @@ class MRNNet(nn.Module):
         # output = (normal_feat.permute(3,1,2,0) * route_info).permute(1,2,0,3).contiguous()
 
         return torch.sum(output, -1), index
-
-
-    # def cross_forwardv2(self, image, text=None, is_train=True, SelfSL_layer=False):
-    #     """Transformation stage"""
-    #     features = [convnet(image)for convnet in self.model]
-    #     route_info = torch.cat([feature["feature"] for feature in features],-1)
-    #     route_info = self.gmlp(route_info)
-    #     route_info = self.channel_route(route_info).permute(0,2,1)
-    #     # route_info = torch.cat([torch.max(feature,-1)[0] for feature in features],-1)
-    #     index = self.route(route_info.contiguous())
-    #     index = self.softargmax1d(torch.squeeze(index,-1))
-    #     # index [B,I]
-    #     # index = torch.max(torch.squeeze(index,-1),-1)[1]
-    #     # index = torch.mean(torch.squeeze(index, -1), -1)
-    #     # index = torch.squeeze(index,-1)
-    #
-    #     # feature_array = torch.stack(features, 1)
-    #     features = [feature["predict"] for feature in features]
-    #     B,T,C = features[-1].size()
-    #     list_len = len(features)
-    #     normal_feat = []
-    #     for i in range(list_len-1):
-    #         feat = self.pad_zeros_features(features[i],total=C)
-    #         normal_feat.append(feat)
-    #     normal_feat.append(features[-1])
-    #     normal_feat = torch.stack(normal_feat,0)
-    #     # normal_feat [I,B,T,C] -> [T,C,B,I] -> [B,T,C,I]
-    #     output = (normal_feat.permute(2,3,1,0) * index).permute(2,0,1,3).contiguous()
-    #
-    #     return torch.sum(output,-1),index
 
     def build_fc(self, hidden_size, nb_classes):
         self.update_fc(hidden_size, nb_classes)
