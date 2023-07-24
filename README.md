@@ -108,8 +108,8 @@ python3 tiny_train.py --config=config/crnn_mrn.py --exp_name CRNN_real
 ```
 ### Arguments
 tiny_train.py (as a default, evaluate trained model on IMLTR datasets at the end of training.
-* `--select_data`: folder path to training lmdb datasets. `[" ../dataset/MLT17_IL/train_2017", "../dataset/MLT19_IL/train_2019"] `
-*  `--valid_datas`: folder path to testing lmdb dataset. `[" ../dataset/MLT17_IL/test_2017", "../dataset/MLT19_IL/test_2019"] `
+* `--select_data`: folder path to training lmdb datasets. </br> `[" ../dataset/MLT17_IL/train_2017", "../dataset/MLT19_IL/train_2019"] `
+*  `--valid_datas`: folder path to testing lmdb dataset. </br>  `[" ../dataset/MLT17_IL/test_2017", "../dataset/MLT19_IL/test_2019"] `
 * `--batch_ratio`: assign ratio for each selected data in the batch. default is '1 / number of datasets'.
 * `--Aug`: whether to use augmentation |None|Blur|Crop|Rot|
 
