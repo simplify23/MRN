@@ -47,7 +47,7 @@ common=dict(
 ```
 
 ### Text Recognition Methods
-* [x] [CRNN](https://ieeexplore.ieee.org/abstract/document/7801919) `[TPAMI2017]`: An End-to-End Trainable Neural Network for Image-Based Sequence Recognition and Its Application <br/> to Scene Text Recognition
+* [x] [CRNN](https://ieeexplore.ieee.org/abstract/document/7801919) `[TPAMI2017]`: An End-to-End Trainable Neural Network for Image-Based Sequence Recognition and Its Application to Scene Text Recognition
 * [x] [TRBA](https://arxiv.org/abs/1904.01906) `[ICCV2019]`:  What Is Wrong With Scene Text Recognition Model Comparisons? Dataset and Model Analysis
 * [x] [SVTR](https://arxiv.org/abs/2205.00159) `[IJCAI2022]`: SVTR: Scene Text Recognition with a Single Visual Model
       
