@@ -30,7 +30,7 @@ This project is a toolkit for the novel scenario of Incremental Multilingual Tex
 ## Methods
 ### Incremental Learning Methods 
 * [x] Base: Baseline method which simply updates parameters on new tasks.
-* [x] Joint: Bound method: data for all tasks are trained at once, an upper bound for the method
+* [x] Joint: Bound method: data for all tasks are trained at once, an upper bound for the method （Joint_mix means all tasks data mixed in batch, Joint_loader means the consistent proportion of data from each task in a batch）
 * [x] [EWC](https://arxiv.org/abs/1612.00796) `[PNAS2017]`: Overcoming catastrophic forgetting in neural networks 
 * [x] [LwF](https://arxiv.org/abs/1911.07053) `[ECCV2016]`:  Learning without Forgetting
 * [x] [WA](https://arxiv.org/abs/1911.07053) `[CVPR2020]`: Maintaining Discrimination and Fairness in Class Incremental Learning 
