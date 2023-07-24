@@ -199,7 +199,7 @@ Please consider citing this work in your publications if it helps your research.
 @article{zheng2023mrn,
   title={MRN: Multiplexed Routing Network for Incremental Multilingual Text Recognition},
   author={Zheng, Tianlun and Chen, Zhineng and Huang, BingChen and Zhang, Wei and Jiang, Yu-Gang},
-  journal={ICCV 2023},
+  journal={Proceedings of the IEEE/CVF International Conference on Computer Vision},
   year={2023}
 }
 ```
