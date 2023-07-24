@@ -21,7 +21,8 @@ This project is a toolkit for the novel scenario of Incremental Multilingual Tex
 
 <div align="center">
     
-![image](https://github.com/simplify23/MRN/assets/39580716/b865e4c3-e1a4-4fb7-a0d2-91ebc959af46)
+<img width="1066" alt="image" src="https://github.com/simplify23/MRN/assets/39580716/fc2b6e12-f511-4a55-9cb4-46ca3e03b004">
+
 
 </div>
 
