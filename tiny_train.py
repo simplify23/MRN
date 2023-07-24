@@ -12,7 +12,7 @@ from il_modules.joint import JointLearner
 from il_modules.lwf import LwF
 from il_modules.wa import WA
 
-print(os.getcwd()) #打印出当前工作路径
+print(os.getcwd())
 import torch
 import torch.backends.cudnn as cudnn
 import torch.utils.data

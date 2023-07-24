@@ -71,17 +71,3 @@ train = dict(
     # model_for_PseudoLabel="",
 )
 
-
-# test=dict(
-#     eval_data="/share/test/ztl/IL/MLT17_IL/",
-#     eval_type="IL_STR",
-#     workers=4,
-#     batch_size=256,
-#     saved_model="saved_models/CRNN_real/best_score.pth", #saved_models/CRNN_real/best_score.pth
-#     log_multiple_test=None,
-#     NED=True,
-#     Aug=None,#|None|Blur|Crop|Rot|
-#     # semi="None",
-#
-# )
-
