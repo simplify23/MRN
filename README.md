@@ -87,6 +87,24 @@ dataset
 │   ├── train_2019
 ```
 
+Incremental MLT17: MLT17 has 68,613 training instances and 16,255 validation instances, which are from 6 scripts and 9 languages: Chinese, Japanese, Korean, Bangla, Arabic, Italian, English, French, and German. The last four use Latin script. Incremental MLT17 use the validation set for test due to the unavailability of test data. Tasks are split by scripts and modeled sequentially. Special symbols are discarded at the preprocessing step as with no linguistic meaning.
+
+Incremental MLT19: MLT19 has 89,177 text instances coming from 7 scripts. Since the inaccessibility of test set, Incremental MLT19 randomly split the training instances to 9:1 script-by-script, for model training and test. To be consistent with Incremental MLT17 dataset, we discard the Hindi script and also special symbols. Statistics of the two datasets are shown in the following.
+
+| Dataset | Categories     |       |       |          |        |        |        |
+|---------|----------------|-------|-------|----------|--------|--------|--------|
+|         |                | Task1 | Task2 | Task3    | Task4  | Task5  | Task6  |
+|         |                | Chinese | Latin | Japanese | Korean | Arabic | Bangla |
+| MLT17[^1^]   | Train Instance | 2687  | 47411 | 4609     | 5631   | 3711   | 3237   |
+|         | Test Instance  | 529   | 11073 | 1350     | 1230   | 983    | 713    |
+|         | Train Class    | 1895  | 325   | 1620     | 1124   | 73     | 112    |
+| MLT19[^2^]   | Train Instance | 2897  | 52921 | 5324     | 6107   | 4230   | 3542   |
+|         | Test Instance  | 322   | 5882  | 590      | 679    | 470    | 393    |
+|         | Train Class    | 2086  | 220   | 1728     | 1160   | 73     | 102    |
+
+[^1^]: Nayef, N., et al. (2017). MLT 2017.
+[^2^]: Nayef, N., et al. (2019). MLT 2019.
+
 
 ## Getting Started
 ### Dependency
